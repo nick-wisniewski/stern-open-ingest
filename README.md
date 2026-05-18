@@ -147,9 +147,14 @@ cp .env.example .env
 $EDITOR .env                   # add TENSORLAKE_API_KEY + provider keys you'll use
 set -a; source .env; set +a
 
+bash scripts/sync-secrets.sh   # push provider keys from .env to Tensorlake
 tl deploy src/workflow.py
 python examples/parse_pdf.py --file my.pdf --ocr-model azure-di
 ```
+
+`scripts/sync-secrets.sh` reads your `.env` and pushes the provider keys the
+workflow declares in `@function(secrets=[...])` to Tensorlake via
+`tl secrets set`. Re-run it whenever those values change.
 
 `tl deploy` packages every `@function()` in `src/workflow.py` and ships it to Tensorlake's pool — re-deploy when those source files change.
 

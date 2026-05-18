@@ -72,6 +72,22 @@ tl secrets unset NAME       # remove
 `.env.example` is the canonical list of names you might need —
 copy the variable names from there straight into `tl secrets set`.
 
+**Shortcut: push everything from `.env` in one shot.** If you already
+filled out a local `.env` (per §2a), run:
+
+```bash
+bash scripts/sync-secrets.sh           # uses ./.env
+bash scripts/sync-secrets.sh path/to/env   # or a custom file
+```
+
+The script sources the file, then calls `tl secrets set` for each
+non-empty key the workflow declares in `@function(secrets=[...])`.
+Empty values are skipped (and printed) instead of clobbering whatever
+is already on Tensorlake. `TENSORLAKE_API_KEY` and
+`TENSORLAKE_MIN_CONTAINERS` are intentionally excluded — the first
+authenticates the CLI/client locally, the second is read at deploy
+time.
+
 > **Re-deploy after changing secrets.** Per Tensorlake's docs, when you
 > add or update a secret used by an already-deployed application, you
 > have to re-run `tl deploy` for the new values to take effect.
