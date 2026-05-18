@@ -72,6 +72,14 @@ tl secrets unset NAME       # remove
 `.env.example` is the canonical list of names you might need —
 copy the variable names from there straight into `tl secrets set`.
 
+`scripts/sync-secrets.sh` reads your `.env` and pushes the provider keys
+the workflow declares in `@function(secrets=[...])` to Tensorlake via
+`tl secrets set`. Re-run it whenever those values change.
+
+```bash
+bash scripts/sync-secrets.sh
+```
+
 > **Re-deploy after changing secrets.** Per Tensorlake's docs, when you
 > add or update a secret used by an already-deployed application, you
 > have to re-run `tl deploy` for the new values to take effect.
