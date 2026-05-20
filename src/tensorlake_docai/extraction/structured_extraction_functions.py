@@ -1445,35 +1445,3 @@ class StructuredExtraction:
 
         return format_final_output(result)
 
-
-if __name__ == "__main__":
-    extractor = StructuredExtraction()
-
-    class PlayerSchema(BaseModel):
-        player_name: str = Field(description="The name of the player")
-        player_team: str = Field(description="The team the player is on")
-        grandmother_name: int = Field(description="Name of Sam Altman's mother")
-        dependent_spouses_name: str = Field(description="Dependent spouse's name")
-
-    schema = PlayerSchema.model_json_schema()
-
-    json_schema = json.dumps(schema)
-    # print(f"JSON schema: {json_schema}")
-    result, input_tokens, output_tokens = extractor.extract_data(
-        parsed_pages=[
-            Chunk(
-                page_number=1,
-                content="Steph Curry is a basketball player for the Golden State Warriors, credited with being one of the best basketball players and 3-point shooters.",
-            ),
-            Chunk(
-                page_number=2,
-                content="Fellow players like Klay Thompson have played in Golden State Warriors as well at the same time",
-            ),
-        ],
-        json_schema=json_schema,
-        model_provider="openai",
-    )
-
-    print("=" * 100)
-    # print(f"Result: {result}")
-    print(f"Token usage - Input: {input_tokens}, Output: {output_tokens}")
