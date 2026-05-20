@@ -1,6 +1,6 @@
 # Open Ingest
 
-[![ci](https://github.com/tensorlakeai/document-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorlakeai/document-ai/actions/workflows/ci.yml)
+[![ci](https://github.com/tensorlakeai/openingest/actions/workflows/ci.yml/badge.svg)](https://github.com/tensorlakeai/openingest/actions/workflows/ci.yml)
 
 Open Ingest is a distributed ingestion API that turns unstructured data into LLM-ready outputs: layout-aware markdown, structured data from charts and figures.
 
@@ -124,8 +124,8 @@ Two ways to run — same `ParseRequest` payload, different runner:
 ### Local run (no deploy)
 
 ```bash
-git clone https://github.com/tensorlakeai/document-ai
-cd document-ai
+git clone https://github.com/tensorlakeai/openingest
+cd openingest
 pip install -e .
 
 export GEMINI_API_KEY=...  
@@ -226,7 +226,7 @@ all live in `src/tensorlake_docai/ocr/dots_ocr.py` and `figure_ocr.py`.
 ## Project layout
 
 ```
-document-ai/
+openingest/
 ├── examples/                    # parse_pdf.py, extract_structured.py
 ├── src/
 │   ├── workflow.py              # `tl deploy` entrypoint — must sit one level above the package
@@ -251,7 +251,7 @@ document-ai/
 
 - **License**: Apache-2.0
 - **Maintenance**: bug fixes and security patches, light feature work
-- **Issues**: [github.com/tensorlakeai/document-ai/issues](https://github.com/tensorlakeai/document-ai/issues)
+- **Issues**: [github.com/tensorlakeai/openingest/issues](https://github.com/tensorlakeai/openingest/issues)
 - **Security**: report to support@tensorlake.ai (see [`SECURITY.md`](SECURITY.md))
 - **Contributing**: see [`CONTRIBUTING.md`](CONTRIBUTING.md)
 

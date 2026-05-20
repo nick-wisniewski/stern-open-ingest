@@ -14,8 +14,8 @@ few business days. To keep things moving:
 ## Dev setup
 
 ```bash
-git clone https://github.com/tensorlakeai/document-ai
-cd document-ai
+git clone https://github.com/tensorlakeai/openingest
+cd openingest
 pip install -e ".[dev]"
 cp .env.example .env  # fill in only the keys you need
 ```

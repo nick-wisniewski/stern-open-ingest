@@ -8,8 +8,8 @@ The deploy entry `src/workflow.py` is **not** shipped via
 PyPI. Always direct users to clone, not `pip install git+...`:
 
 ```bash
-git clone https://github.com/tensorlakeai/document-ai
-cd document-ai
+git clone https://github.com/tensorlakeai/openingest
+cd openingest
 pip install -e .
 tl deploy src/workflow.py
 ```

@@ -11,8 +11,8 @@ Clone (or fork) the repo — `tl deploy` needs `src/workflow.py`,
 which isn't shipped via PyPI:
 
 ```bash
-git clone https://github.com/tensorlakeai/document-ai
-cd document-ai
+git clone https://github.com/tensorlakeai/OpenIngest
+cd OpenIngest
 pip install -e .
 ```
 

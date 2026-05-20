@@ -15,8 +15,8 @@ You can prototype with `--local`, then drop the flag once you have keys and a de
 ## 1. Install
 
 ```bash
-git clone https://github.com/tensorlakeai/document-ai
-cd document-ai
+git clone https://github.com/tensorlakeai/OpenIngest
+cd OpenIngest
 pip install -e .
 ```
 

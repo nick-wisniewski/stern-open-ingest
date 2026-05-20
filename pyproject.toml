@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Tensorlake", email = "hello@tensorlake.ai" }]
-keywords = ["document-ai", "ocr", "vlm", "pdf", "tensorlake", "structured-extraction"]
+keywords = ["openingest", "ocr", "vlm", "pdf", "tensorlake", "structured-extraction"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -69,8 +69,8 @@ pyo3 = "0.28.3"
 dev = ["pytest", "pytest-mock", "ruff", "black"]
 
 [project.urls]
-Homepage = "https://github.com/tensorlakeai/document-ai"
-Issues = "https://github.com/tensorlakeai/document-ai/issues"
+Homepage = "https://github.com/tensorlakeai/openingest"
+Issues = "https://github.com/tensorlakeai/openingest/issues"
 
 [tool.setuptools.packages.find]
 where = ["src"]
