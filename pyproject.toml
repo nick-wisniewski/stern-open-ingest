@@ -60,10 +60,8 @@ dependencies = [
     "protobuf>=6.33.5,<7.0",
     "pytest>=9.0.3",
     "chardet>=7.4.3",
+    "python-docx>=1.2.0",
 ]
-
-[dependencies]
-pyo3 = "0.28.3"
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-mock", "ruff", "black"]
@@ -87,5 +85,5 @@ target-version = ["py312"]
 line-length = 100
 target-version = "py312"
 
-[tool.uv.env]
+[tool.uv.extra-build-variables.cryptography]
 PYO3_USE_ABI3_FORWARD_COMPATIBILITY = "1"
