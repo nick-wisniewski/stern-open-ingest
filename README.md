@@ -45,9 +45,9 @@ Given a PDF, image, DOCX, or Office file, the workflow:
 
    | `ocr_model` | Provider | Best for |
    |-------------|----------|----------|
-   | `dots-ocr` | [DotsOCR](https://github.com/rednote-hilab/dots.mocr) + [Ovis2.5](https://huggingface.co/AIDC-AI/Ovis2.5-9B) on a CUDA GPU | Complex documents — open-sourced with the full serving setup (vLLM, two-stage Ovis figure OCR, masked-region retries). Needs your own GPU host (`--local`) or a managed Tensorlake deployment. |
-   | `azure-di`  | [Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence) | Fast cloud OCR with cell-level table bboxes |
-   | `textract` | [AWS Textract](https://aws.amazon.com/textract/) | Native PDF, async S3 jobs |
+   | `dots-ocr` (model03) | [DotsOCR](https://github.com/rednote-hilab/dots.mocr) + [Ovis2.5](https://huggingface.co/AIDC-AI/Ovis2.5-9B) on a CUDA GPU | Complex documents — open-sourced with the full serving setup (vLLM, two-stage Ovis figure OCR, masked-region retries). Needs your own GPU host (`--local`) or a managed Tensorlake deployment. |
+   | `azure-di` (model01)  | [Azure Document Intelligence](https://azure.microsoft.com/en-us/products/ai-services/ai-document-intelligence) | Fast cloud OCR with cell-level table bboxes |
+   | `textract` (model02) | [AWS Textract](https://aws.amazon.com/textract/) | Native PDF, async S3 jobs |
    | `gemini` | [Google Gemini](https://ai.google.dev/) VLM | VLM-powered semantic OCR |
 
 3. **Enriches** with VLM passes (optional): table summarization, figure
