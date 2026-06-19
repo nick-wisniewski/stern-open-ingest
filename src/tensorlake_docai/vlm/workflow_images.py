@@ -62,9 +62,7 @@ ocr_gpu_cuda_image = (
 file_convertion_image = (
     Image(base_image="python:3.12-slim", name="documentai/file-convert")
     .env("DEBIAN_FRONTEND", "noninteractive")
-    .run(
-        "apt-get update && apt-get install -y poppler-utils libmagic1 && rm -rf /var/lib/apt/lists/*"
-    )
+    .run("apt-get update && apt-get install -y libmagic1 && rm -rf /var/lib/apt/lists/*")
     .run("python -m pip install --upgrade pip wheel setuptools")
     .run("pip install python-magic==0.4.27")
     .run("pip install requests boto3")

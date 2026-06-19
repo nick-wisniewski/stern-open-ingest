@@ -46,10 +46,6 @@ def _create_parsed_document(result: ParseResult) -> ParsedDocument:
         result.document_layout.total_pages if result.document_layout else 0
     )
 
-    if result.form_filling_result:
-        parsed_document.filled_pdf_base64 = result.form_filling_result.filled_pdf_base64
-        parsed_document.form_filling_metadata = result.form_filling_result.metadata
-
     return parsed_document
 
 

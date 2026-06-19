@@ -173,22 +173,6 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--ignore-sections` | `ignore_sections` — e.g. `--ignore-sections page_footer figure` |
 | `--include-images` | `include_images` |
 
-### Form filling
-
-Form filling needs a `FormFillingRequest`, so it's not on `parse_pdf.py`'s CLI.
-Add it inline:
-
-```python
-from tensorlake_docai.pipeline.api import FormFillingRequest
-
-ParseRequest(
-    ..., form_filling=FormFillingRequest(fill_prompt="Fill applicant fields from the source PDF"),
-)
-```
-
-Routes through the `FormFilling` task instead of the OCR branch. See
-`extraction/form_filling.py`.
-
 ### File inputs
 
 `ParseRequest` accepts the file in one of two mutually-exclusive forms:
@@ -214,7 +198,7 @@ Both examples produce a `ParsedDocument` (`pipeline/api.py`):
 | `chunks[]` | Flattened content per `chunk_strategy` |
 | `page_classes[]` | Classification results |
 | `merged_tables[]` | Cross-page table stitching |
-| `usage` | Token counts per stage (OCR / VLM / form filling / header correction) |
+| `usage` | Token counts per stage (OCR / VLM / header correction) |
 
 `parse_pdf.py` writes `./debug/document.json` plus one markdown file per chunk.
 

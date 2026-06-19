@@ -9,7 +9,6 @@ from tensorlake.applications import application, function, Retries
 from tensorlake.applications import RequestError as RequestException
 from tensorlake_docai.vlm.cloud import VLMExtractionTask
 from tensorlake_docai.pipeline.output_formatter import format_final_output
-from tensorlake_docai.extraction.form_filling import FormFilling
 from tensorlake_docai.vlm.workflow_images import file_convertion_image
 from tensorlake_docai.pipeline.api import (
     ParseRequest,
@@ -205,10 +204,8 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
     print(
         f"DEBUG: raw_request file_bytes: {repr(raw_request.get('file_bytes', 'NOT_PROVIDED')[:50] if raw_request.get('file_bytes') else None)}"
     )
-    print(f"DEBUG: raw_request form_filling: {repr(raw_request.get('form_filling'))}")
 
     request = ParseRequest.model_validate(raw_request)
-    print(f"DEBUG: request.form_filling: {repr(request.form_filling)}")
     print(f"DEBUG: request keys: {list(request.model_dump().keys())}")
 
     process_file_from_s3_or_url(request)
@@ -267,10 +264,6 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
         request=request,
         usage=usage,
     )
-
-    if request.form_filling:
-        print("🔀 FILE_CONVERTOR → FormFilling")
-        return FormFilling().run.future(parse_result)
 
     if file_convertor_should_go_to_output_formatter(request):
         print("🔀 FILE_CONVERTOR → OutputFormatter")

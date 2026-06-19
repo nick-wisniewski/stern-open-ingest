@@ -25,7 +25,6 @@ from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upl
 # Post-OCR enrichment.
 from tensorlake_docai.tables.table_merging import TableMerging  # noqa: F401
 from tensorlake_docai.vlm.cloud import VLMExtractionTask  # noqa: F401
-from tensorlake_docai.extraction.form_filling import FormFilling  # noqa: F401
 
 # Output formatting (terminal node).
 from tensorlake_docai.pipeline.output_formatter import format_final_output  # noqa: F401

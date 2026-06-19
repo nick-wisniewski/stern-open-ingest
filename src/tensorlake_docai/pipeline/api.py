@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 from enum import Enum
-from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
+from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -237,8 +237,6 @@ class ParsedDocument(BaseModel):
     total_pages: Optional[int] = None
     page_classes: Optional[List[PageClass]] = None
     document_markdown: Optional[str] = None  # Full document markdown representation
-    filled_pdf_base64: Optional[str] = None
-    form_filling_metadata: Optional[Dict[str, Any]] = None
 
 
 class Usage(BaseModel):
@@ -256,13 +254,6 @@ class Usage(BaseModel):
 class ParsedDocumentRef(BaseModel):
     document: Optional[Dict] = None
     usage: Optional[Usage] = None
-
-
-class FormFillingRequest(BaseModel):
-    fill_prompt: Optional[str] = None
-    ignore_source_values: Optional[bool] = False
-    no_acroform: Optional[bool] = False
-    no_widget_detection: Optional[bool] = False
 
 
 class QuotaResourceType(str, Enum):
@@ -346,4 +337,3 @@ class ParseRequest(BaseModel):
     org_quota: Optional[OrganizationQuotaRequest] = None
     xpage_header_detection: bool = False
     include_images: Optional[bool] = False
-    form_filling: Optional[FormFillingRequest] = None
