@@ -43,9 +43,6 @@ class FullPageDolphinTask:
         min_containers=int(os.getenv("TENSORLAKE_MIN_CONTAINERS", "0")),
     )
     def run(self, parse_result: ParseResult) -> ParseResult:
-        if parse_result.request.mime_type.startswith("text/"):
-            return parse_result
-
         # ...call your OCR provider, fill in parse_result.document_layout...
 
         return route_after_ocr(parse_result, log_prefix="FULL_PAGE_DOLPHIN")
@@ -53,9 +50,7 @@ class FullPageDolphinTask:
 
 The contract is in [`base.py`](base.py): the `run` method must take a
 `ParseResult` and return one (or a future of one — `route_after_ocr` handles
-both). The early-return for text files matches what every other backend
-does; the dispatcher sends text-only requests through the OCR ladder when
-no other path applies, so backends must no-op on them.
+both). Ingest accepts PDF and image MIME types only.
 
 ### 2. Register it in [`ocr/__init__.py`](__init__.py)
 
@@ -73,27 +68,24 @@ only fire when the registry actually resolves that entry).
 ### 3. Widen the `ocr_model` enum in [`pipeline/api.py`](../pipeline/api.py)
 
 ```python
-ocr_model: Optional[
-    Literal["dots-ocr", "azure-di", "textract", "gemini", "dolphin"]
-] = "azure-di"
+ocr_model: Optional[Literal["dots-ocr", "dolphin"]] = "dots-ocr"
 ```
 
 This is pydantic's API-boundary validation — without it, requests with
 `ocr_model="dolphin"` are rejected before they reach the registry.
 
-### 4. Import it in [`workflow.py`](../workflow.py) for `tl deploy`
+### 4. Import it in [`workflow.py`](../workflow.py)
 
 ```python
 from tensorlake_docai.ocr.dolphin import FullPageDolphinTask  # noqa: F401
 ```
 
-`tl deploy` walks `workflow.py` to discover every `@function()` / `@cls()`
-that should be packed into the deployment bundle. The registry's lazy
-import is great for runtime workers but invisible to the deploy CLI —
-hence the explicit import here.
+Importing `workflow.py` registers every `@function()` / `@cls()` so the
+`--local` runner can dispatch them. The registry's lazy import is great for
+runtime workers but invisible at registration time — hence the explicit import
+here.
 
-That's it. Try a request with `ocr_model="dolphin"` against your local
-deployment.
+That's it. Try a request with `ocr_model="dolphin"`.
 
 ## What you get for free
 
@@ -101,8 +93,8 @@ By calling `route_after_ocr`, your backend automatically participates in:
 
 - **Table merging** when the request asks for it and your output contains tables.
 - **Structured extraction** when a schema is provided.
-- **VLM enrichment** (figure/table summarization, chart extraction, signature
-  detection, key-value extraction, page classification) when those flags are
+- **VLM enrichment** (figure/table summarization, chart extraction,
+  key-value extraction, page classification) when those flags are
   set and the relevant fragments exist in your output.
 - **Output formatting** as the terminal step.
 

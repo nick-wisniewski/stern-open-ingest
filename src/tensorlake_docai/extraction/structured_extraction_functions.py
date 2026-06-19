@@ -30,7 +30,6 @@ from tensorlake_docai.extraction.tabular_content_splitter import (
     estimate_tokens,
     is_output_token_limit_error,
     merge_extraction_results,
-    should_split_dense_table,
     split_dense_table_content,
 )
 from tensorlake.applications import RequestError as RequestException
@@ -42,13 +41,6 @@ from tensorlake_docai.pipeline.routing import stream_with_timeout, update_progre
 SAFE_TOKEN_LIMIT = 8000
 
 SYSTEM_PROMPT = """You are an expert at extracting information from text."""
-
-# Azure OpenAI Configuration:
-# Set USE_AZURE_OPENAI=true to use Azure OpenAI instead of regular OpenAI
-# Required environment variables when using Azure OpenAI:
-# - AZURE_OPENAI_ENDPOINT: The endpoint URL for your Azure OpenAI resource
-# - AZURE_OPENAI_API_KEY: The API key for your Azure OpenAI resource
-# - AZURE_OPENAI_MODEL_DEPLOYMENT_NAME: The deployment name of your model in Azure OpenAI
 
 
 def _redact_provider_names(raw_error: str) -> str:
@@ -271,10 +263,6 @@ SECRETS = [
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
     "AWS_REGION",
-    "USE_AZURE_OPENAI",
-    "AZURE_OPENAI_ENDPOINT",
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_MODEL_DEPLOYMENT_NAME",
 ]
 
 
@@ -1137,30 +1125,12 @@ class StructuredExtraction:
 
                 print("#####file mime_type in structured extraction: ", request.mime_type)
 
-                # Check for dense tabular content that needs special chunking only in CSV or Excel inputs
-                if (
-                    request
-                    and request.mime_type in ["text/table", "text/csv"]
-                    and json_schema
-                    and should_split_dense_table(json_schema, content_to_extract, model_provider)
-                ):
-                    print(
-                        f"Dense tabular content detected for chunk {chunk_number}, using table splitting approach"
-                    )
-                    model_response = await self._extract_json_with_dense_table_splitting(
-                        model_provider=model_provider,
-                        text=content_to_extract,
-                        json_schema=json_schema,
-                        prompt=enhanced_prompt,
-                    )
-                else:
-                    # Regular extraction
-                    model_response = await self._extract_json(
-                        model_provider=model_provider,
-                        text=content_to_extract,
-                        json_schema=json_schema,
-                        prompt=enhanced_prompt,
-                    )
+                model_response = await self._extract_json(
+                    model_provider=model_provider,
+                    text=content_to_extract,
+                    json_schema=json_schema,
+                    prompt=enhanced_prompt,
+                )
 
                 extraction_time = time.time() - extraction_start
                 print(f"Extraction for chunk {chunk_number} completed in {extraction_time:.2f}s")
@@ -1426,7 +1396,6 @@ class StructuredExtraction:
                     if result.document_layout and result.document_layout.pages
                     else 0
                 ),
-                signature_detection=result.request.detect_signature,
             )
 
         # Add LLM tokens to existing usage

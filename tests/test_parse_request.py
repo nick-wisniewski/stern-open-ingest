@@ -9,7 +9,7 @@ from tensorlake_docai.pipeline.api import ParseRequest
 
 def test_minimal_request_with_bytes():
     req = ParseRequest(file_name="x.pdf", mime_type="application/pdf", file_bytes="aGVsbG8=")
-    assert req.ocr_model == "azure-di"  # default
+    assert req.ocr_model == "dots-ocr"  # default
     assert req.table_parsing_strategy == "vlm"
 
 

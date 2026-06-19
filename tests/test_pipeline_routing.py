@@ -37,15 +37,6 @@ def _pdf_request(**overrides) -> ParseRequest:
     )
 
 
-def _text_request(**overrides) -> ParseRequest:
-    return ParseRequest(
-        file_name="x.txt",
-        mime_type="text/plain",
-        file_bytes="aGVsbG8=",
-        **overrides,
-    )
-
-
 def _element(fragment_type: PageFragmentType, ocr_text: str = "") -> PageLayoutElement:
     return PageLayoutElement(
         bbox=(0.0, 0.0, 100.0, 100.0),
@@ -84,29 +75,27 @@ def test_unknown_ocr_model_falls_back_to_default():
     """Unknown values should not crash — they fall back to DEFAULT_OCR_MODEL.
     pydantic's Literal validates real user input at the API boundary; this
     guards against internal callers passing through stale strings."""
-    assert resolve_ocr_backend("model99") is resolve_ocr_backend("azure-di")
-    assert resolve_ocr_backend(None) is resolve_ocr_backend("azure-di")
+    assert resolve_ocr_backend("model99") is resolve_ocr_backend("dots-ocr")
+    assert resolve_ocr_backend(None) is resolve_ocr_backend("dots-ocr")
 
 
-def test_text_file_skips_ocr_and_goes_to_output_formatter():
-    req = _text_request()
-    assert routing.file_convertor_should_go_to_output_formatter(req)
-    assert not routing.file_convertor_should_go_to_ocr(req)
-
-
-def test_text_file_with_structured_extraction_goes_to_structured_extraction():
-    from tensorlake_docai.pipeline.api import StructuredExtractionRequest
-
-    req = _text_request(
-        structured_extraction_requests=[
-            StructuredExtractionRequest(
-                json_schema='{"type":"object"}',
-                schema_name="x",
-            )
-        ]
-    )
-    assert routing.file_convertor_should_go_to_structured_extraction(req)
+def test_pdf_file_goes_to_ocr_by_default():
+    req = _pdf_request()
     assert not routing.file_convertor_should_go_to_output_formatter(req)
+    assert routing.file_convertor_should_go_to_ocr(req)
+    assert not routing.file_convertor_should_go_to_structured_extraction(req)
+
+
+def test_pdf_with_page_classification_goes_to_vlm():
+    from tensorlake_docai.pipeline.api import ClassificationRequest, PageClassDefinition
+
+    req = _pdf_request(
+        page_classification_request=ClassificationRequest(
+            class_definitions=[PageClassDefinition(class_name="invoice", description="Invoice")],
+        )
+    )
+    assert routing.file_convertor_should_go_to_vlm_extraction(req)
+    assert not routing.file_convertor_should_go_to_ocr(req)
 
 
 # ---- post-OCR routing: bare parse → output formatter ---------------------
@@ -128,7 +117,7 @@ def test_post_ocr_structured_extraction_routes_to_se():
     from tensorlake_docai.pipeline.api import StructuredExtractionRequest
 
     req = _pdf_request(
-        ocr_model="azure-di",
+        ocr_model="dots-ocr",
         structured_extraction_requests=[
             StructuredExtractionRequest(
                 json_schema='{"type":"object"}',
@@ -147,7 +136,7 @@ def test_post_ocr_structured_extraction_routes_to_se():
 
 
 def test_table_summarization_skipped_when_no_tables_found():
-    req = _pdf_request(ocr_model="azure-di", table_summarization=True)
+    req = _pdf_request(ocr_model="dots-ocr", table_summarization=True)
     parse_result = _parse_result(req, [_element(PageFragmentType.TEXT, "no tables here")])
 
     # table_summarization=True but document has no tables → don't go to VLM
@@ -158,14 +147,14 @@ def test_table_summarization_skipped_when_no_tables_found():
 
 
 def test_table_summarization_routes_to_vlm_when_tables_present():
-    req = _pdf_request(ocr_model="azure-di", table_summarization=True)
+    req = _pdf_request(ocr_model="dots-ocr", table_summarization=True)
     parse_result = _parse_result(req, [_element(PageFragmentType.TABLE)])
 
     assert routing.ocr_should_go_to_vlm_extraction(req, parse_result)
 
 
 def test_figure_summarization_routes_to_vlm_when_figures_present():
-    req = _pdf_request(ocr_model="azure-di", figure_summarization=True)
+    req = _pdf_request(ocr_model="dots-ocr", figure_summarization=True)
     parse_result = _parse_result(req, [_element(PageFragmentType.FIGURE)])
 
     assert routing.ocr_should_go_to_vlm_extraction(req, parse_result)

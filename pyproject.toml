@@ -34,16 +34,14 @@ dependencies = [
     "s3fs",
     # Image and PDF
     "pillow",
+    "pillow-heif",
     "numpy",
-    "pandas",
     "pypdf",
     "pymupdf",
     "psutil",
     "img2pdf==0.6.3",
-    # OCR providers
+    # Page preprocessing
     "jdeskew==0.3.0",
-    "amazon-textract-textractor",
-    "azure-ai-documentintelligence",
     # Validation / parsing
     "pydantic",
     "tiktoken==0.11.0",
@@ -51,16 +49,12 @@ dependencies = [
     "lxml==6.1.0",
     # File handling
     "python-magic==0.4.27",
-    "openpyxl",
-    "xlrd",
     # Utilities
     "markdownify",
     "cryptography==46.0.7",
     # Pins to resolve transitive conflicts
     "protobuf>=6.33.5,<7.0",
     "pytest>=9.0.3",
-    "chardet>=7.4.3",
-    "python-docx>=1.2.0",
     "pdf2image>=1.17.0",
     "pytest-cov>=7.1.0",
 ]

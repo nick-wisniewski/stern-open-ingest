@@ -22,7 +22,6 @@ from tensorlake_docai.pipeline.routing import (
     dots_ocr_should_go_to_vlm_extraction,
     file_convertor_should_go_to_ocr,
     file_convertor_should_go_to_output_formatter,
-    file_convertor_should_go_to_structured_extraction,
     file_convertor_should_go_to_vlm_extraction,
     handle_processing_error,
     is_markdown_table,
@@ -35,7 +34,6 @@ from tensorlake_docai.pipeline.routing import (
     vlm_extraction_should_go_to_output_formatter,
     vlm_extraction_should_go_to_structured_extraction,
 )
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -265,31 +263,25 @@ def test_should_skip_ocr_no_requests_returns_false():
 # ---------------------------------------------------------------------------
 
 
-def test_file_convertor_text_no_extras_goes_to_output_formatter():
-    req = _req(mime_type="text/plain")
-    assert file_convertor_should_go_to_output_formatter(req)
-    assert not file_convertor_should_go_to_ocr(req)
-
-
 def test_file_convertor_pdf_no_skip_ocr_goes_to_ocr():
     req = _req(mime_type="application/pdf")
     assert file_convertor_should_go_to_ocr(req)
     assert not file_convertor_should_go_to_output_formatter(req)
 
 
-def test_file_convertor_text_with_se_goes_to_structured_extraction():
-    req = _req(mime_type="text/plain", structured_extraction_requests=[_se_req()])
-    assert file_convertor_should_go_to_structured_extraction(req)
-    assert not file_convertor_should_go_to_output_formatter(req)
+def test_file_convertor_pdf_with_skip_ocr_goes_to_vlm():
+    req = _req(mime_type="application/pdf", structured_extraction_requests=[_se_req(skip_ocr=True)])
+    assert file_convertor_should_go_to_vlm_extraction(req)
+    assert not file_convertor_should_go_to_ocr(req)
 
 
-def test_file_convertor_text_with_page_classification_goes_to_vlm():
+def test_file_convertor_pdf_with_page_classification_goes_to_vlm():
     cls_req = ClassificationRequest(
         class_definitions=[_cls_def("invoice")], classification_type="multi_class"
     )
-    req = _req(mime_type="text/plain", page_classification_request=cls_req)
+    req = _req(mime_type="application/pdf", page_classification_request=cls_req)
     assert file_convertor_should_go_to_vlm_extraction(req)
-    assert not file_convertor_should_go_to_output_formatter(req)
+    assert not file_convertor_should_go_to_ocr(req)
 
 
 # ---------------------------------------------------------------------------

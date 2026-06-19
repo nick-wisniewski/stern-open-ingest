@@ -8,7 +8,6 @@ from pydantic import BaseModel
 
 class FormFillingResult(BaseModel):
     filled_pdf_base64: Optional[str] = None
-    filled_docx_base64: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
 
 
@@ -18,7 +17,6 @@ class ParseResult(BaseModel):
     structured_outputs_by_page: Optional[Dict[int, Any]] = None
     request: ParseRequest
     usage: Optional[Usage] = None
-    docx_converted_pdf_base64: Optional[str] = None
 
 
 class FileData(BaseModel):

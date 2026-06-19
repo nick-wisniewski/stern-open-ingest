@@ -11,9 +11,6 @@ import importlib
 import pytest
 
 OCR_PROVIDERS = [
-    ("tensorlake_docai.ocr.azure", "FullPageAzureTask"),
-    ("tensorlake_docai.ocr.textract", "FullPageTextractTask"),
-    ("tensorlake_docai.ocr.gemini", "FullPageGeminiTask"),
     ("tensorlake_docai.ocr.dots_ocr", "DotsOCRTask"),
     ("tensorlake_docai.ocr.figure_ocr", "OvisFigureOCRTask"),
 ]

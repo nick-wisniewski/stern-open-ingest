@@ -4,61 +4,11 @@
 import asyncio
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from tensorlake_docai.providers.model_provider_utils import (
     _get_api_semaphore,
-    _load_azure_openai_config,
     get_openai_client_and_model,
     get_openai_sync_client_and_model,
 )
-
-
-# ---------------------------------------------------------------------------
-# _load_azure_openai_config
-# ---------------------------------------------------------------------------
-
-
-def test_load_azure_config_disabled_by_default(monkeypatch):
-    monkeypatch.delenv("USE_AZURE_OPENAI", raising=False)
-    assert _load_azure_openai_config() is None
-
-
-def test_load_azure_config_disabled_explicitly(monkeypatch):
-    monkeypatch.setenv("USE_AZURE_OPENAI", "false")
-    assert _load_azure_openai_config() is None
-
-
-def test_load_azure_config_enabled_returns_tuple(monkeypatch):
-    monkeypatch.setenv("USE_AZURE_OPENAI", "true")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://my.azure.openai.com")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "secret-key")
-    monkeypatch.setenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", "gpt-4o")
-    result = _load_azure_openai_config()
-    assert result == ("https://my.azure.openai.com", "secret-key", "gpt-4o")
-
-
-def test_load_azure_config_enabled_missing_vars_raises(monkeypatch):
-    from tensorlake.applications import RequestError as RequestException
-
-    monkeypatch.setenv("USE_AZURE_OPENAI", "true")
-    monkeypatch.delenv("AZURE_OPENAI_ENDPOINT", raising=False)
-    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", raising=False)
-    with pytest.raises(RequestException):
-        _load_azure_openai_config()
-
-
-def test_load_azure_config_enabled_partial_vars_raises(monkeypatch):
-    from tensorlake.applications import RequestError as RequestException
-
-    monkeypatch.setenv("USE_AZURE_OPENAI", "true")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://my.azure.openai.com")
-    monkeypatch.delenv("AZURE_OPENAI_API_KEY", raising=False)
-    monkeypatch.delenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", raising=False)
-    with pytest.raises(RequestException):
-        _load_azure_openai_config()
-
 
 # ---------------------------------------------------------------------------
 # get_openai_client_and_model (async client)
@@ -66,7 +16,6 @@ def test_load_azure_config_enabled_partial_vars_raises(monkeypatch):
 
 
 def test_get_openai_client_regular(monkeypatch):
-    monkeypatch.delenv("USE_AZURE_OPENAI", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     mock_client = MagicMock()
@@ -76,32 +25,7 @@ def test_get_openai_client_regular(monkeypatch):
         assert isinstance(model, str)
 
 
-def test_get_openai_client_azure_path(monkeypatch):
-    monkeypatch.setenv("USE_AZURE_OPENAI", "true")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://my.azure.openai.com")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "az-key")
-    monkeypatch.setenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", "gpt-4-deploy")
-
-    mock_azure_client = MagicMock()
-    with patch("openai.AsyncAzureOpenAI", return_value=mock_azure_client):
-        client, model = get_openai_client_and_model()
-        assert model == "gpt-4-deploy"
-
-
-def test_get_openai_sync_client_azure_path(monkeypatch):
-    monkeypatch.setenv("USE_AZURE_OPENAI", "true")
-    monkeypatch.setenv("AZURE_OPENAI_ENDPOINT", "https://my.azure.openai.com")
-    monkeypatch.setenv("AZURE_OPENAI_API_KEY", "az-key")
-    monkeypatch.setenv("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME", "gpt-4-deploy")
-
-    mock_azure_client = MagicMock()
-    with patch("openai.AzureOpenAI", return_value=mock_azure_client):
-        client, model = get_openai_sync_client_and_model()
-        assert model == "gpt-4-deploy"
-
-
 def test_get_openai_sync_client_regular(monkeypatch):
-    monkeypatch.delenv("USE_AZURE_OPENAI", raising=False)
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
 
     mock_client = MagicMock()

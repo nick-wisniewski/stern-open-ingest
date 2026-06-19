@@ -47,57 +47,20 @@ def get_gemini_async_client_and_model(
     return client.aio, model_name
 
 
-AZURE_OPENAI_API_VERSION = "2025-04-01-preview"
-
-
-def _load_azure_openai_config() -> Optional[tuple]:
-    """Return (endpoint, api_key, deployment) when USE_AZURE_OPENAI is enabled, else None.
-
-    Raises RequestException when enabled but any of the three required vars is missing.
-    """
-    if os.environ.get("USE_AZURE_OPENAI", "false").lower() != "true":
-        return None
-
-    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT")
-    api_key = os.environ.get("AZURE_OPENAI_API_KEY")
-    deployment = os.environ.get("AZURE_OPENAI_MODEL_DEPLOYMENT_NAME")
-
-    if not endpoint or not api_key or not deployment:
-        raise RequestException(
-            message="Azure OpenAI configuration incomplete. Required: AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_MODEL_DEPLOYMENT_NAME"
-        )
-    return endpoint, api_key, deployment
-
-
 def get_openai_client_and_model(
     api_key: Optional[str] = None, default_model: str = OPENAI_LLM_MODEL_NAME
 ):
     """
-    Return (AsyncOpenAI client, model_name) for either Azure or regular OpenAI.
+    Return (AsyncOpenAI client, model_name).
 
     Args:
-        api_key: Optional API key for regular OpenAI. If None, uses "OPENAI_API_KEY" from env.
-        default_model: Default model name for regular OpenAI (ignored for Azure). Defaults to OPENAI_LLM_MODEL_NAME.
+        api_key: Optional API key. If None, uses "OPENAI_API_KEY" from env.
+        default_model: Default model name. Defaults to OPENAI_LLM_MODEL_NAME.
 
     Returns:
-        Tuple of (client, model_name) where:
-        - client is AsyncAzureOpenAI for Azure or AsyncOpenAI for regular
-        - model_name is the deployment name for Azure or default_model for regular
-
-    Raises:
-        RequestException if Azure is enabled but config is incomplete.
+        Tuple of (AsyncOpenAI client, model_name).
     """
-    from openai import AsyncAzureOpenAI, AsyncOpenAI
-
-    azure = _load_azure_openai_config()
-    if azure:
-        endpoint, azure_api_key, deployment = azure
-        client = AsyncAzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=azure_api_key,
-            api_version=AZURE_OPENAI_API_VERSION,
-        )
-        return client, deployment
+    from openai import AsyncOpenAI
 
     key = api_key or os.environ.get("OPENAI_API_KEY")
     return AsyncOpenAI(api_key=key), default_model
@@ -107,17 +70,7 @@ def get_openai_sync_client_and_model(
     api_key: Optional[str] = None, default_model: str = OPENAI_LLM_MODEL_NAME
 ):
     """Sync counterpart of get_openai_client_and_model. See that function for semantics."""
-    from openai import AzureOpenAI, OpenAI
-
-    azure = _load_azure_openai_config()
-    if azure:
-        endpoint, azure_api_key, deployment = azure
-        client = AzureOpenAI(
-            azure_endpoint=endpoint,
-            api_key=azure_api_key,
-            api_version=AZURE_OPENAI_API_VERSION,
-        )
-        return client, deployment
+    from openai import OpenAI
 
     key = api_key or os.environ.get("OPENAI_API_KEY")
     return OpenAI(api_key=key), default_model
@@ -482,13 +435,11 @@ async def _make_oai_call(
 
     try:
         # Get configured OpenAI client and model name
-        use_azure_openai = os.environ.get("USE_AZURE_OPENAI", "false").lower() == "true"
         client_context, model_name = get_openai_client_and_model(
             default_model=OPENAI_VLM_MODEL_NAME
         )
 
         async with client_context as oai_client:
-            # Azure OpenAI uses chat.completions API
             chat_content = [{"type": "text", "text": user_prompt}]
             for img_url in image_urls:
                 chat_content.append({"type": "image_url", "image_url": {"url": img_url}})
@@ -556,7 +507,7 @@ async def _make_oai_call(
                         print(f"WARNING: Failed to close OpenAI stream: {e}")
 
         llm_time = time.time() - start_time
-        provider_name = "Azure OpenAI" if use_azure_openai else "OpenAI"
+        provider_name = "OpenAI"
         print(f"{provider_name} streaming response time: {llm_time:.2f}s")
 
         # Extract token usage
@@ -579,7 +530,7 @@ async def _make_oai_call(
         )
 
     except asyncio.TimeoutError as e:
-        provider_name = "Azure OpenAI" if use_azure_openai else "OpenAI"
+        provider_name = "OpenAI"
         error_message = f"{provider_name} VLM timed out due to inactivity: {str(e)}"
         print(f"Timeout error in {provider_name} streaming call: {error_message}")
         raise RequestException(message=error_message)

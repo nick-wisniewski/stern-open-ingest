@@ -22,30 +22,11 @@ KEY_PATH_PREFIX = "workflow-step-output"
 # File type mapping - shared with file_convertor.py
 FILE_TYPE_MAPPING = {
     "application/pdf": "pdf",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": "pptx",
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": "xlsx",
-    "application/vnd.ms-excel": "xls",
-    "application/vnd.ms-excel.sheet.macroenabled.12": "xlsm",
-    "application/vnd.ms-powerpoint": "ppt",
-    "application/vnd.apple.keynote": "key",
-    "image/jpeg": "jpg",
     "image/png": "png",
-    "image/tiff": "tiff",
-    "image/tif": "tiff",
-    "text/plain": "txt",
-    "text/markdown": "md",
-    "text/x-markdown": "md",
-    "text/csv": "csv",
-    "text/html": "html",
-    "text/xml": "xml",
-    "application/xml": "xml",
-    "application/msword": "doc",
-    "text/rtf": "rtf",
-    "application/rtf": "rtf",
-    "application/pkcs7-mime": "p7m",
-    "application/x-pkcs7-mime": "p7m",
-    "application/pkcs7-signature": "p7m",
+    "image/jpeg": "jpeg",
+    "image/jpg": "jpg",
+    "image/heif": "heif",
+    "image/heic": "heic",
 }
 
 
@@ -455,42 +436,40 @@ def create_classification_choice_and_prompt(
 
 # FILE_CONVERTOR NODE ROUTING
 def file_convertor_should_go_to_output_formatter(request) -> bool:
-    """Text files with no structured extraction or page classification go directly to OutputFormatter"""
-    return (
-        request.mime_type.startswith("text/")
-        and not request.structured_extraction_requests
-        and not request.page_classification_request
-    )
+    """PDF/image inputs always continue to OCR or VLM — never terminate here."""
+    return False
 
 
 def file_convertor_should_go_to_vlm_extraction(request) -> bool:
-    """Should go to VLM when skip_ocr is enabled OR when page_classification is requested"""
-    # Text files: go to VLM only if page classification is requested
-    if request.mime_type.startswith("text/"):
-        return request.page_classification_request
-    # Non-text files: go to VLM if skip_ocr is enabled OR page_classification is requested
-    else:
-        return should_skip_ocr(request)
+    """Go to VLM when skip_ocr is enabled or page classification is requested."""
+    return should_skip_ocr(request) or bool(request.page_classification_request)
 
 
 def file_convertor_should_go_to_structured_extraction(request) -> bool:
-    """Text files with structured extraction but no VLM tasks"""
-    has_structured_extraction = bool(request.structured_extraction_requests)
-
-    # Don't go directly to structured extraction if VLM tasks (like page classification) are needed first
-    has_vlm_tasks = file_convertor_should_go_to_vlm_extraction(request)
-
-    return request.mime_type.startswith("text/") and has_structured_extraction and not has_vlm_tasks
+    """Structured extraction on PDF/images runs after OCR (or via skip_ocr → VLM)."""
+    return False
 
 
 def file_convertor_should_go_to_ocr(request) -> bool:
-    """Non-text file that needs OCR. The actual backend is selected from the
-    :data:`tensorlake_docai.ocr.OCR_BACKENDS` registry using
-    ``request.ocr_model``."""
-    return not request.mime_type.startswith("text/") and not should_skip_ocr(request)
+    """PDF and image inputs need OCR unless skip_ocr or page-classification-only."""
+    if should_skip_ocr(request):
+        return False
+    if request.page_classification_request:
+        needs_ocr_layout = bool(
+            request.structured_extraction_requests
+            or request.figure_summarization
+            or request.figure_grounding
+            or request.chart_extraction
+            or request.table_summarization
+            or request.table_cell_grounding
+            or request.key_value_extraction
+        )
+        if not needs_ocr_layout:
+            return False
+    return True
 
 
-# OCR NODE ROUTING (used by Azure, Textact and Model03)
+# OCR NODE ROUTING (used by every OCR backend after layout extraction)
 def ocr_should_go_to_output_formatter(request) -> bool:
     """Go to OutputFormatter if no further processing needed"""
     return not (
@@ -501,7 +480,6 @@ def ocr_should_go_to_output_formatter(request) -> bool:
         or request.table_summarization
         or request.table_cell_grounding
         or request.page_classification_request
-        or request.detect_signature
     )
 
 
@@ -625,7 +603,6 @@ def dots_ocr_should_go_to_output_formatter(request, parse_result: ParseResult) -
         or (request.chart_extraction and (has_chart or has_figure or has_table))
         or (request.key_value_extraction and (has_form or has_figure or has_table))
         or request.page_classification_request
-        or request.detect_signature
     )
 
 
@@ -642,7 +619,6 @@ def ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> bool:
         or (request.key_value_extraction and (has_figure or has_table or has_form))
         or (request.figure_grounding and has_figure)
         or request.page_classification_request
-        or request.detect_signature
         or should_skip_ocr(request)
     )
 
@@ -664,7 +640,6 @@ def dots_ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> 
         or (request.key_value_extraction and (has_form or has_figure or has_table))
         or (request.figure_grounding and has_figure)
         or request.page_classification_request
-        or request.detect_signature
         or should_skip_ocr(request)
     )
 

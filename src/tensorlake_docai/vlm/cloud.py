@@ -1,10 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
-# Document Understanding Tasks constains
-# after migration it will has these 4 pieces in this function
-# 1. Signature detection: Textract
-# 2. Figure and Table summarization: Gemini
-# 3. Page classification: Gemini
-# 4. Structure extraction when skip_ocr is True: Gemini
+# Document Understanding Tasks. This function batches the post-OCR VLM passes:
+# 1. Figure and Table summarization
+# 2. Page classification
+# 3. Structured extraction when skip_ocr is True
 
 import asyncio
 import json
@@ -53,13 +51,6 @@ SECRETS = [
     "GEMINI_API_KEY",
     "OPENAI_API_KEY",
     "ANTHROPIC_API_KEY",
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_REGION",
-    "USE_AZURE_OPENAI",
-    "AZURE_OPENAI_ENDPOINT",
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_MODEL_DEPLOYMENT_NAME",
 ]
 
 MEMORY_IN_GB = 8
@@ -158,110 +149,6 @@ def clean_page_classification_result(raw_result):
     except (json.JSONDecodeError, ValueError):
         # If JSON parsing fails, return the cleaned string
         return result_str, None, None
-
-
-def signature_detection(page_image, scale_factor=1.0):
-    """
-    Detect signatures in a page image using Textract.
-
-    Args:
-        page_image: PIL Image object of the page (potentially scaled)
-        scale_factor: The scaling factor applied to the image
-
-    Returns:
-        list: List of signature elements (PageLayoutElement objects) with coordinates in original document space
-    """
-    from textractor import Textractor
-    from textractor.data.constants import TextractFeatures
-    from tensorlake_docai.models.layout_objects import PageLayoutElement
-    import time
-    import random
-
-    try:
-        # Retry logic for rate limiting
-        max_retries = 3
-        document = None
-
-        for attempt in range(max_retries):
-            try:
-                extractor = Textractor(region_name="us-west-1")
-                document = extractor.analyze_document(
-                    file_source=page_image,
-                    features=[TextractFeatures.SIGNATURES],
-                    save_image=False,
-                )
-                break  # Success, exit retry loop
-            except Exception as e:
-                if "ProvisionedThroughputExceededException" in str(e) and attempt < max_retries - 1:
-                    # Exponential backoff with jitter
-                    wait_time = (2**attempt) + random.uniform(0, 1)
-                    print(f"Rate limit exceeded, retrying in {wait_time:.2f} seconds...")
-                    time.sleep(wait_time)
-                    continue
-                else:
-                    # Re-raise if not rate limit or max retries reached
-                    print(f"Error during Textract signature detection: {e}")
-                    raise RequestException(
-                        message="Error during signature detection, Please contact Tensorlake support"
-                    )
-
-        signatures = document.signatures
-        signature_elements = []
-
-        if len(signatures) > 0:
-            page_width, page_height = page_image.size
-            for signature in signatures:
-                # Convert normalized coordinates to absolute coordinates in scaled space
-                x, y, w, h = (
-                    signature.bbox.x,
-                    signature.bbox.y,
-                    signature.bbox.width,
-                    signature.bbox.height,
-                )
-                abs_x1 = int(x * page_width)
-                abs_y1 = int(y * page_height)
-                abs_x2 = int((x + w) * page_width)
-                abs_y2 = int((y + h) * page_height)
-
-                # Convert scaled coordinates back to original document coordinates
-                original_x1 = int(abs_x1 / scale_factor)
-                original_y1 = int(abs_y1 / scale_factor)
-                original_x2 = int(abs_x2 / scale_factor)
-                original_y2 = int(abs_y2 / scale_factor)
-
-                signature_element = PageLayoutElement(
-                    bbox=(original_x1, original_y1, original_x2, original_y2),
-                    fragment_type=PageFragmentType.SIGNATURE,
-                    score=1.0,
-                    reading_order=-1,
-                    ocr_text="Signature detected",
-                )
-                signature_elements.append(signature_element)
-        else:
-            # Add a "No signature detected" element
-            signature_element = PageLayoutElement(
-                bbox=(0, 0, 0, 0),
-                fragment_type=PageFragmentType.SIGNATURE,
-                score=0.0,
-                reading_order=-1,
-                ocr_text="No signature detected",
-            )
-            signature_elements.append(signature_element)
-
-        return signature_elements
-
-    except Exception as e:
-        print(f"Error during signature detection: {e}")
-        # Return a "No signature detected" element instead of raising exception
-        # This allows parallel processing to continue even if one page fails
-        signature_element = PageLayoutElement(
-            bbox=(0, 0, 0, 0),
-            fragment_type=PageFragmentType.SIGNATURE,
-            score=0.0,
-            reading_order=-1,
-            ocr_text="No signature detected",
-        )
-        return [signature_element]
 
 
 @cls()
@@ -766,10 +653,6 @@ class VLMExtractionTask(BatchProcessor):
                 scale_factor,
             )
 
-        # Process signature detection for this batch
-        if current_request.detect_signature:
-            self._process_signature_detection_batch(page_images_dict, scale_factor, batch_number)
-
         # Process page classification for this batch
         if current_request.page_classification_request:
             await self._process_page_classification_batch(page_images_dict, batch_number)
@@ -794,47 +677,6 @@ class VLMExtractionTask(BatchProcessor):
         print(f"Batch {batch_number} completed: {len(page_images_dict)} pages processed")
         # Return empty list since we modify pages in-place (should_preserve_existing_pages=True)
         return []
-
-    def _process_signature_detection_batch(self, page_images_dict, scale_factor, batch_number):
-        """Process signature detection for a batch of pages."""
-        print(
-            f"Running signature detection for batch {batch_number}: {len(page_images_dict)} pages"
-        )
-
-        signature_start_time = time.time()
-
-        # Collect valid page layouts and images for parallel processing
-        valid_items = []
-        for page_num, page_image in page_images_dict.items():
-            # Find the corresponding page layout
-            for layout in self._current_parse_result.document_layout.pages:
-                if layout.page_number == page_num:
-                    valid_items.append((layout, page_image))
-                    break
-
-        if not valid_items:
-            return
-
-        # Run signature detection in parallel
-        from concurrent.futures import ThreadPoolExecutor
-
-        page_layouts, page_images = zip(*valid_items)
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            results = executor.map(
-                signature_detection, page_images, [scale_factor] * len(page_images)
-            )
-
-        # Add results to page layouts
-        for page_layout, signature_elements in zip(page_layouts, results):
-            page_layout.elements.extend(signature_elements)
-            print(
-                f"Batch {batch_number}: Added {len(signature_elements)} signature elements to page {page_layout.page_number}"
-            )
-
-        signature_end_time = time.time()
-        print(
-            f"Batch {batch_number} signature detection time: {signature_end_time - signature_start_time:.2f} seconds"
-        )
 
     async def _process_page_classification_batch(self, page_images_dict, batch_number):
         """Process page classification for a batch of pages."""
@@ -1136,82 +978,6 @@ class VLMExtractionTask(BatchProcessor):
                     parse_result.structured_outputs_by_page[page_key] = {}
                 parse_result.structured_outputs_by_page[page_key][schema_name] = json_result
 
-    async def _classify_pages_with_text(self, parse_result: ParseResult):
-        """
-        Perform page classification using only text content.
-        For text-based input files (text/plain, text/csv, etc.), no OCR is performed.
-        Text content is already extracted during file conversion.
-        """
-        print(
-            f"Running text-only page classification for {len(parse_result.document_layout.pages)} pages"
-        )
-
-        page_classification_start_time = time.time()
-
-        # Get classification configuration
-        page_classification_schema, _, page_classification_prompt = (
-            create_classification_choice_and_prompt(
-                parse_result.request.page_classification_request.class_definitions,
-                parse_result.request.page_classification_request.classification_type,
-            )
-        )
-
-        from tensorlake_docai.providers.model_provider_utils import (
-            _make_gemini_call,
-            _make_oai_call,
-            run_clients,
-        )
-
-        page_classification_models = [_make_gemini_call, _make_oai_call]
-
-        page_classification_tasks = []
-        pages_for_classification = []
-
-        for page_layout in parse_result.document_layout.pages:
-            # For text files, element.ocr_text contains the raw text content (no OCR performed)
-            page_text = "\n".join(
-                element.ocr_text
-                for element in page_layout.elements
-                if element.ocr_text and element.ocr_text.strip()
-            )
-
-            # Create text-only prompt with page content
-            text_classification_prompt = (
-                f"{page_classification_prompt}\n\nPage content:\n{page_text}"
-            )
-
-            pages_for_classification.append(page_layout)
-            page_classification_tasks.append(
-                run_clients(
-                    user_prompt=text_classification_prompt,
-                    images=[],  # No images for text-only classification
-                    models=page_classification_models,
-                    json_schema=page_classification_schema,
-                    job_type="page_classification",
-                )
-            )
-
-        print(f"Awaiting {len(page_classification_tasks)} text-only page classification tasks...")
-        results_with_tokens = await asyncio.gather(*page_classification_tasks)
-
-        # Extract results and track tokens
-        raw_results = []
-        for result, input_tokens, output_tokens in results_with_tokens:
-            raw_results.append(result)
-            self.structured_extraction_input_tokens += input_tokens
-            self.structured_extraction_output_tokens += output_tokens
-
-        for page_layout, raw_result in zip(pages_for_classification, raw_results):
-            page_class, reason, confidence = clean_page_classification_result(raw_result)
-            page_layout.page_class = page_class
-            page_layout.classification_reason = reason
-            page_layout.classification_confidence = confidence
-
-        page_classification_end_time = time.time()
-        print(
-            f"Text-only page classification time: {page_classification_end_time - page_classification_start_time:.2f} seconds"
-        )
-
     @function(
         image=vlm_extraction_image,
         timeout=30 * 60,  # 30 minutes
@@ -1239,44 +1005,6 @@ class VLMExtractionTask(BatchProcessor):
         self.figure_grounding_input_tokens = 0
         self.figure_grounding_output_tokens = 0
 
-        # Handle text-only inputs (text/plain, text/csv, text/html, etc.)
-        # NO OCR NEEDED: Text content is already extracted in file_convertor.py
-        # Pages already contain text in element.ocr_text field (despite the name, no OCR is performed)
-        if (
-            parse_result.request.mime_type.startswith("text/")
-            and parse_result.request.page_classification_request
-        ):
-            print("🔧 Running text-only page classification (no OCR, no images)...")
-            asyncio.run(self._classify_pages_with_text(parse_result))
-
-            # Update token usage
-            if parse_result.usage:
-                parse_result.usage.extraction_input_tokens_used = (
-                    self.structured_extraction_input_tokens
-                )
-                parse_result.usage.extraction_output_tokens_used = (
-                    self.structured_extraction_output_tokens
-                )
-            else:
-                from tensorlake_docai.pipeline.api import Usage
-
-                parse_result.usage = Usage(
-                    pages_parsed=0,
-                    extraction_input_tokens_used=self.structured_extraction_input_tokens,
-                    extraction_output_tokens_used=self.structured_extraction_output_tokens,
-                    summarization_input_tokens_used=0,
-                    summarization_output_tokens_used=0,
-                )
-
-            # For text-only inputs, return early after classification (skip all image-based VLM tasks)
-            # Node-by-node routing decisions
-            if vlm_extraction_should_go_to_structured_extraction(parse_result.request):
-                print("🔀 VLM_EXTRACTION (text-only) → StructuredExtraction")
-                return StructuredExtraction().run.future(parse_result)
-            else:
-                print("🔀 VLM_EXTRACTION (text-only) → OutputFormatter")
-                return format_final_output(parse_result)
-
         # Determine if any task requires page images based on skip_ocr flag and vlm related tasks
         skip_ocr_reqs = skip_ocr_requests(parse_result.request)
         skip_ocr = bool(skip_ocr_reqs)
@@ -1288,7 +1016,6 @@ class VLMExtractionTask(BatchProcessor):
             or parse_result.request.table_cell_grounding
             or parse_result.request.key_value_extraction
             or parse_result.request.figure_grounding
-            or parse_result.request.detect_signature
             or parse_result.request.page_classification_request
             or skip_ocr
         )

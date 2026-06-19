@@ -1,49 +1,45 @@
-# OCR models
+# OCR model
 
-Open Ingest ships four OCR backends. Pick the one that matches your
-constraints (cost, latency, features, deployment model) and pass it via
-`ocr_model` on the `ParseRequest`.
+This fork ships a single OCR backend: **`dots-ocr`**, the open-source engine we
+run ourselves. The cloud backends from upstream (Azure Document Intelligence,
+AWS Textract, Google Gemini) have been removed. Select the backend via
+`ocr_model` on the `ParseRequest` (it defaults to `dots-ocr`).
 
-## Backend comparison
+> Gemini is still available as an LLM/VLM **provider** (e.g. for table merging,
+> page classification, and structured extraction) — it is just no longer an OCR
+> backend.
 
-| `ocr_model` | Provider | Native PDF | Cell bboxes | Forms / KV | Barcodes | Custom prompt | Hardware |
-|-------------|----------|:---:|:---:|:---:|:---:|:---:|----------|
-| `dots-ocr` | DotsOCR + Ovis2.5 | converts | ✅ | ✅ | ✅ | ✅ | CUDA GPU (local or managed) |
-| `azure-di` *(default)* | Azure Document Intelligence | ✅ | ✅ | ✅ | — | — | Azure cloud |
-| `textract` | AWS Textract | ✅ | ✅ | ✅ | — | — | AWS cloud |
-| `gemini` | Google Gemini VLM | ✅ | ✅ | partial | — | — | Google cloud |
+## `dots-ocr`
 
-`dots-ocr` is the backend with the most serving work in this repo —
-open-sourced with the full setup (vLLM, two-stage Ovis figure OCR,
-masked-region retries). It needs a CUDA-equipped host — either a
-`--local` run on your own GPU, or a managed Tensorlake GPU
-deployment. The `@function()` decorators are pre-pinned to
-`H100`/`A100-80GB`, but GPU workers aren't part of the open
-serverless tier today — reach out to support@tensorlake.ai if you'd
-like a managed deployment. Requests that ask for `dots-ocr` without
-a GPU fail at task start with a `RequestError` suggesting one of the
-cloud backends.
+| Capability | Support |
+|---|---|
+| Native PDF | converts pages to images first |
+| Cell bounding boxes | ✅ |
+| Forms / key-value | ✅ |
+| Barcodes | ✅ |
+| Custom figure-OCR prompt | ✅ |
+| Hardware | CUDA GPU |
 
-## Picking a model
+`dots-ocr` runs [DotsOCR](https://github.com/rednote-hilab/dots.mocr) (layout +
+OCR) plus [Ovis2.5-9B](https://huggingface.co/AIDC-AI/Ovis2.5-9B) (figure OCR)
+on a CUDA-equipped host. The full serving setup lives in the repo: vLLM engine,
+two-stage Ovis figure OCR, and masked-region retries. A request that asks for
+`dots-ocr` without a GPU fails at task start with a `RequestError`.
 
-- **Don't know yet?** Start with `azure-di` — fast cloud OCR with cell-level
-  table bboxes, no GPU required.
-- **Need signatures or async S3 jobs?** `textract`.
-- **VLM-style semantic OCR?** `gemini` — slower but reads context.
-- **Complex documents on your own GPU?** `dots-ocr` ships with the full
-  serving setup (vLLM, two-stage Ovis figure OCR, masked-region retries).
-  Needs a CUDA host (local or managed).
+> **Direction:** per [`CLAUDE.md`](../CLAUDE.md), we are evaluating a lighter OCR
+> backend (e.g. PaddleOCR-VL) added under `src/tensorlake_docai/ocr/` via the
+> bring-your-own-OCR path, plus a born-digital-first CPU text path ahead of the
+> GPU OCR worker. Check the live registrations in `src/tensorlake_docai/ocr/`
+> for what is actually wired up.
 
 ## Required env vars
 
-See [`.env.example`](../.env.example) — each backend lists its keys with the
-features it unlocks. Missing keys disable that backend; the rest of the
-pipeline still runs.
+See [`.env.example`](../.env.example). `dots-ocr` needs no API keys — just a
+CUDA host. Weights are pulled from Hugging Face Hub on first cold-start.
 
-## Figure OCR (dots-ocr only)
+## Figure OCR
 
-When `ocr_model='dots-ocr'`, DotsOCR outputs are post-processed by
-[Ovis2.5-9B](https://huggingface.co/AIDC-AI/Ovis2.5-9B) running on a
-separate GPU container. The Ovis pass classifies each cropped figure
-(`BARCODE`, `CHART`, `DIAGRAM`, `FORM`, `TABLE`, `OTHER`) and extracts
-content with a type-specific prompt.
+DotsOCR outputs are post-processed by Ovis2.5-9B running on a separate GPU
+container. The Ovis pass classifies each cropped figure (`BARCODE`, `CHART`,
+`DIAGRAM`, `FORM`, `TABLE`, `OTHER`) and extracts content with a type-specific
+prompt.

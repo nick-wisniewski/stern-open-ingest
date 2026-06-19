@@ -41,11 +41,8 @@ vlm_extraction_image = (
     .run("pip install opencv-python-headless")  # Headless OpenCV for jdeskew
     .run("pip install jdeskew==0.3.0 --no-deps")
     .run(f"pip install '{PYDANTIC_PIN}'")  # Data validation
-    .run("pip install boto3 requests markdownify")  # AWS and HTTP
+    .run("pip install boto3 requests markdownify")  # S3 + HTTP file download
     .run("pip install openai==2.3.0 google-genai==1.51.0")
-    .run(
-        "pip install amazon-textract-textractor"
-    )  # Removed azure-ai-documentintelligence - not used
     .run("pip cache purge")
 )
 
@@ -64,7 +61,7 @@ ocr_gpu_cuda_image = (
     .run("pip install s3fs boto3 cryptography==46.0.5")
     .run("pip install qwen-vl-utils")
     .run("pip install markdownify zxing==1.0.3")
-    .run("pip install pillow numpy pandas")
+    .run("pip install pillow numpy")
     .run("pip install pdf2image pypdf")
     .run("pip install opencv-python-headless")  # Headless OpenCV for jdeskew
     .run("pip install jdeskew==0.3.0 --no-deps")
@@ -77,14 +74,13 @@ file_convertion_image = (
     Image(base_image="python:3.12-slim", name="documentai/file-convert")
     .env("DEBIAN_FRONTEND", "noninteractive")
     .run(
-        "apt-get update && apt-get install -y poppler-utils libreoffice libmagic1 openssl && rm -rf /var/lib/apt/lists/*"
+        "apt-get update && apt-get install -y poppler-utils libmagic1 && rm -rf /var/lib/apt/lists/*"
     )
     .run("python -m pip install --upgrade pip wheel setuptools")
-    .run("pip install python-magic==0.4.27 markdownify")
-    .run("pip install requests boto3 google-genai==1.51.0")
+    .run("pip install python-magic==0.4.27")
+    .run("pip install requests boto3")
     .run(f"pip install '{PYDANTIC_PIN}'")
-    .run("pip install lxml==6.0.2 beautifulsoup4 cryptography==46.0.5 python-docx chardet")
-    .run("pip install pillow pandas openpyxl xlrd PyMuPDF pypdf pdf2image")
+    .run("pip install pillow-heif pypdf")
     .run("pip cache purge")
 )
 
@@ -92,15 +88,14 @@ simple_page_creator_image = (
     Image(base_image="python:3.12-slim", name="documentai/simple-page-creator")
     .run("apt-get update && apt-get install -y libxcb1 && rm -rf /var/lib/apt/lists/*")
     .run("python -m pip install --upgrade pip wheel setuptools")
-    .run("pip install pillow numpy")
+    .run("pip install pillow pillow-heif numpy")
     .run("pip install pypdf img2pdf==0.6.3 psutil pymupdf")  # PDF handling
     .run(
         "pip install opencv-python-headless"
     )  # Headless OpenCV for jdeskew (used by simple_page_creator)
     .run("pip install jdeskew==0.3.0 --no-deps")
     .run(f"pip install '{PYDANTIC_PIN}' markdownify")  # Data validation
-    .run("pip install boto3 requests")  # AWS + HTTP
+    .run("pip install boto3 requests")  # S3 + HTTP file download
     .run("pip install openai google-genai==1.51.0")
-    .run("pip install amazon-textract-textractor azure-ai-documentintelligence")
     .run("pip cache purge")
 )

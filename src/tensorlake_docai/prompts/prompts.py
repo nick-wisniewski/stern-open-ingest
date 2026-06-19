@@ -370,25 +370,6 @@ def get_element_summary_prompt(element_types: list[PageFragmentType], has_page_i
         return TABLE_SUMMARY_USER_PROMPT if has_page_image else TABLE_SUMMARY_USER_PROMPT_NO_PAGE
 
 
-QWEN_SIGNATURE_DETECTION_SYSTEM_PROMPT = (
-    """You are an assistant that detects handwritten signatures in images."""
-)
-QWEN_SIGNATURE_DETECTION_PROMPT = """
-Spotting all signed signatures in the image with line-level,
-return results in this exact JSON format:
-{
-    "has_signature": true/false,
-    "bbox_2d": [
-        [x1, y1, x2, y2],
-        [x1, y1, x2, y2]
-    ]
-}
-Where:
-- "has_signature" is true if any signatures found, false otherwise
-- "bbox_2d" contains the coordinates [top-left x, top-left y, bottom-right x, bottom-right y] for each signature
-- If no signatures, return empty list for bbox_2d
-"""
-
 # Update form to html prompt to handle itypical forms that only have key or value
 QWEN_FORM_TO_HTML_SYSTEM_PROMPT = """You are an AI specialized in recognizing and extracting text from images. Your mission is to analyze the image document and generate the result in QwenVL Document Parser HTML format using specified tags while maintaining user privacy and data integrity."""
 QWEN_FORM_TO_HTML_PROMPT = """Analyze the provided image and Extract ONLY the visible text and convert to HTML. Return ONLY HTML code. Follow these strict rules:

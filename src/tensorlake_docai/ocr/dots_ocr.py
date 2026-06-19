@@ -27,10 +27,6 @@ from tensorlake_docai.ocr.figure_ocr import OvisFigureOCRTask
 
 SECRETS = [
     "OPENAI_API_KEY",
-    "USE_AZURE_OPENAI",
-    "AZURE_OPENAI_ENDPOINT",
-    "AZURE_OPENAI_API_KEY",
-    "AZURE_OPENAI_MODEL_DEPLOYMENT_NAME",
 ]
 
 # GPU-specific config
@@ -444,8 +440,7 @@ class DotsOCRTask(BatchProcessor):
             raise RequestException(
                 message=(
                     "ocr_model='dots-ocr' requires a CUDA-equipped worker, but no GPU "
-                    "is available. Pick a cloud OCR backend (azure-di, textract, gemini) "
-                    "or run on a GPU host."
+                    "is available. Run on a GPU host."
                 )
             )
 

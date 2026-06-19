@@ -12,7 +12,6 @@ from tensorlake_docai.ocr.utils import (
 )
 from tensorlake_docai.pipeline.api import PageFragmentType
 
-
 # ---------------------------------------------------------------------------
 # map_dotsocr_category_to_fragment_type
 # ---------------------------------------------------------------------------

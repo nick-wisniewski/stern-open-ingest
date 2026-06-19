@@ -7,6 +7,13 @@ from tensorlake_docai.pipeline.routing import FILE_TYPE_MAPPING
 from tensorlake_docai.ocr import image_preprocessing_utils
 from PIL import Image
 
+try:
+    from pillow_heif import register_heif_opener
+
+    register_heif_opener()
+except ImportError:
+    pass
+
 from pydantic import BaseModel
 
 # PDF standard: 1 inch = 72 points
@@ -57,7 +64,7 @@ class ImageDimensions(BaseModel):
 
 
 class SimplePageCreator:
-    """Create page images from PDFs, images, or TIFFs, with batching."""
+    """Create page images from PDFs and raster images (PNG, JPEG, HEIF, HEIC)."""
 
     def __init__(self, scale_factor: float = 1.0, batch_size: int = 20, memory_gb: float = None):
         self.scale_factor = scale_factor
@@ -108,57 +115,6 @@ class SimplePageCreator:
             scale_factor=scale_factor,
             original_sizes=original_sizes,
         )
-
-    def _iter_batches_tiff(self, data: bytes, wanted: List[int], image_dimensions: ImageDimensions):
-        import io
-        from PIL import Image
-
-        with Image.open(io.BytesIO(data)) as img:
-            total = getattr(img, "n_frames", 1)
-            pages = wanted or list(range(1, total + 1))
-            # Calculate dynamic batch size based on TIFF dimensions
-            tiff_width, tiff_height = img.size
-            bytes_per_image = tiff_width * tiff_height * 3  # RGB
-            dynamic_batch_size = max(1, int(self.max_ram_bytes / bytes_per_image))
-            batch_size = min(dynamic_batch_size, self.batch_size)
-            for page_batch in batched(pages, batch_size):
-                batch = OrderedDict()
-                original_sizes = OrderedDict()
-                for p in page_batch:
-                    if 1 <= p <= total:
-                        img.seek(p - 1)
-                        # Use to_rgb for proper color mode handling (same as regular images)
-                        converted = image_preprocessing_utils.to_rgb(img.copy())
-                        original_size = converted.size
-                        scale_factor = 1.0
-
-                        # Upgrade DPI for better OCR (same as regular images)
-                        if image_dimensions.upgrade_image_dpi:
-                            converted = image_preprocessing_utils.get_image_by_fitz_doc(
-                                converted, target_dpi=image_dimensions.target_dpi
-                            )
-                            scale_factor = original_size[0] / float(converted.size[0])
-
-                        # Optional resize for TIFF frames (preserve aspect ratio correctly)
-                        if image_dimensions.min_pixels and image_dimensions.max_pixels:
-                            target_height, target_width = image_preprocessing_utils.smart_resize(
-                                converted.height,
-                                converted.width,
-                                min_pixels=image_dimensions.min_pixels,
-                                max_pixels=image_dimensions.max_pixels,
-                            )
-                            if (target_width, target_height) != (converted.width, converted.height):
-                                converted = converted.resize((target_width, target_height))
-                                scale_factor = original_size[0] / float(converted.size[0])
-
-                        batch[p] = converted
-                        original_sizes[p] = original_size
-                yield DocumentPages(
-                    total_pages=total,
-                    page_images=batch,
-                    scale_factor=scale_factor,
-                    original_sizes=original_sizes,
-                )
 
     def _iter_batches_pdf(self, data: bytes, wanted: List[int], image_dimensions: ImageDimensions):
         from tensorlake.applications import RequestError as RequestException
@@ -309,10 +265,8 @@ class SimplePageCreator:
         try:
             apply_skew = parse_result.request.skew_correction
             iterator = None
-            if file_type in ["jpg", "jpeg", "png"]:
+            if file_type in ["jpg", "jpeg", "png", "heif", "heic"]:
                 iterator = self._iter_batches_image(data, image_dimensions)
-            elif file_type in ["tif", "tiff"]:
-                iterator = self._iter_batches_tiff(data, wanted, image_dimensions)
             elif file_type == "pdf":
                 iterator = self._iter_batches_pdf(data, wanted, image_dimensions)
             else:

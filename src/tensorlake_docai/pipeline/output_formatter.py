@@ -48,11 +48,9 @@ def _create_parsed_document(result: ParseResult) -> ParsedDocument:
     parsed_document.total_pages = (
         result.document_layout.total_pages if result.document_layout else 0
     )
-    parsed_document.docx_converted_pdf_base64 = result.docx_converted_pdf_base64
 
     if result.form_filling_result:
         parsed_document.filled_pdf_base64 = result.form_filling_result.filled_pdf_base64
-        parsed_document.filled_docx_base64 = result.form_filling_result.filled_docx_base64
         parsed_document.form_filling_metadata = result.form_filling_result.metadata
 
     return parsed_document
@@ -119,12 +117,8 @@ def _calculate_usage(
     elif u and u.pages_parsed:
         pages_parsed = u.pages_parsed
 
-    # Extract request flags
-    detect_signature = result.request.detect_signature if result.request else False
-
     return Usage(
         pages_parsed=pages_parsed,
-        signature_detection=detect_signature,
         ocr_input_tokens_used=(u.ocr_input_tokens_used or 0) if u else 0,
         ocr_output_tokens_used=(u.ocr_output_tokens_used or 0) if u else 0,
         extraction_input_tokens_used=(u.extraction_input_tokens_used or 0) if u else 0,

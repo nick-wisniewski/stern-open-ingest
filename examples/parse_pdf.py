@@ -1,20 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python
 """
-Parse a single PDF (or image / DOCX) with Open Ingest.
+Parse a single PDF or image with Open Ingest.
 
 Usage:
-    # Local dry-run, no deploy needed
+    # Run the pipeline in-process
     python examples/parse_pdf.py --file my.pdf --local
-
-    # Against a deployed workflow
-    tl deploy src/workflow.py
-    python examples/parse_pdf.py --file my.pdf
 
     # With VLM enrichment
     python examples/parse_pdf.py --file my.pdf --local \
         --table-merging --table-summarization --figure-summarization \
-        --chart-extraction --detect-signature
+        --chart-extraction
 
     # With page classification
     python examples/parse_pdf.py --file my.pdf --local \
@@ -44,15 +40,10 @@ from tensorlake_docai.postprocess.formatter import page_to_markdown
 MIME_BY_EXT = {
     ".pdf": "application/pdf",
     ".png": "image/png",
-    ".jpg": "image/jpeg",
+    ".jpg": "image/jpg",
     ".jpeg": "image/jpeg",
-    ".tif": "image/tiff",
-    ".tiff": "image/tiff",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".doc": "application/msword",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".csv": "text/csv",
-    ".txt": "text/plain",
+    ".heif": "image/heif",
+    ".heic": "image/heic",
 }
 
 
@@ -101,7 +92,6 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
         pages_to_parse=args.pages or None,
         chunk_strategy=args.chunk_strategy,
         table_output_mode=args.table_output_mode,
-        detect_signature=args.detect_signature,
         detect_barcode=args.detect_barcode,
         table_merging=args.table_merging,
         table_summarization=args.table_summarization,
@@ -130,9 +120,9 @@ def main() -> None:
     core.add_argument("--file", required=True, help="Local path, s3:// URL, or https:// URL")
     core.add_argument(
         "--ocr-model",
-        default="azure-di",
-        choices=["dots-ocr", "azure-di", "textract", "gemini"],
-        help="OCR backend (see docs/models.md). Default: azure-di.",
+        default="dots-ocr",
+        choices=["dots-ocr"],
+        help="OCR backend (see docs/models.md). Default: dots-ocr.",
     )
     core.add_argument("--pages", type=int, nargs="*", help="Pages to parse (1-indexed)")
     core.add_argument(
@@ -171,11 +161,6 @@ def main() -> None:
     )
 
     detection = parser.add_argument_group("detection")
-    detection.add_argument(
-        "--detect-signature",
-        action="store_true",
-        help="Detect signatures (Textract; requires AWS keys)",
-    )
     detection.add_argument(
         "--detect-barcode", action="store_true", help="Detect barcodes in the document"
     )

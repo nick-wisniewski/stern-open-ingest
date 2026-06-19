@@ -13,13 +13,10 @@ from typing import Optional
 # such as ``dots_ocr`` — which import heavyweight CUDA deps at
 # module load — are only imported when actually dispatched to.
 OCR_BACKENDS: dict[str, str] = {
-    "azure-di": "tensorlake_docai.ocr.azure.FullPageAzureTask",
-    "textract": "tensorlake_docai.ocr.textract.FullPageTextractTask",
-    "gemini": "tensorlake_docai.ocr.gemini.FullPageGeminiTask",
     "dots-ocr": "tensorlake_docai.ocr.dots_ocr.DotsOCRTask",
 }
 
-DEFAULT_OCR_MODEL = "azure-di"
+DEFAULT_OCR_MODEL = "dots-ocr"
 
 
 def resolve_ocr_backend(ocr_model: Optional[str]):

@@ -1,39 +1,24 @@
 # SPDX-License-Identifier: Apache-2.0
 """
-`tl deploy` entrypoint for the Open Ingest pipeline.
+Entrypoint that registers every workflow function for the Open Ingest pipeline.
 
-This file must sit ONE LEVEL ABOVE the `tensorlake_docai/` package
-(i.e. at `src/workflow.py`, not inside `src/tensorlake_docai/`).
-`tl deploy` ships the directory containing the entry file as the
-zip root, so keeping `tensorlake_docai/` as a sibling preserves the
-package name — without that, absolute imports like
-`from tensorlake_docai.vlm.cloud import ...` inside the bundled
-submodules fail with `ModuleNotFoundError` in the function executor.
-
-The SDK still requires every `@function()`/`@application()` source
-file to live under the entry file's directory; `src/` satisfies that
-because all functions are defined inside `src/tensorlake_docai/...`.
+Importing this module wires up all the `@function()`/`@cls()` tasks so the
+`--local` runner can dispatch them in-process. This file must sit ONE LEVEL
+ABOVE the `tensorlake_docai/` package (i.e. at `src/workflow.py`, not inside
+`src/tensorlake_docai/`) so absolute imports like
+`from tensorlake_docai.vlm.cloud import ...` resolve consistently.
 
 Usage:
     pip install -e .
-    tl deploy src/workflow.py
-
-Invoke with `run_remote_application(normalize_file_type_and_upload, ...)`
-from a Python client — see `examples/parse_pdf.py`.
+    python examples/parse_pdf.py --file my.pdf --local
 """
 
 # Application entry — file conversion + OCR routing.
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload  # noqa: F401
 
-# Downstream OCR tasks.
-from tensorlake_docai.ocr.azure import FullPageAzureTask  # noqa: F401
-from tensorlake_docai.ocr.textract import FullPageTextractTask  # noqa: F401
-from tensorlake_docai.ocr.gemini import FullPageGeminiTask  # noqa: F401
-
-# `dots-ocr` GPU path — requires a CUDA-equipped Tensorlake worker.
-# Disabled by default so `tl deploy` does NOT build the heavy
-# `ocr-gpu-cuda` image (vLLM + CUDA, multi-GB). Re-enable both imports
-# once you have a GPU pool provisioned.
+# `dots-ocr` GPU path — requires a CUDA-equipped worker (vLLM + CUDA, multi-GB
+# image). Disabled by default so a non-GPU runner does not have to build the
+# heavy `ocr-gpu-cuda` image. Re-enable both imports once you have a GPU host.
 # from tensorlake_docai.ocr.dots_ocr import DotsOCRTask  # noqa: F401
 # from tensorlake_docai.ocr.figure_ocr import OvisFigureOCRTask  # noqa: F401
 

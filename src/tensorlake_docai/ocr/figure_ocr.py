@@ -196,7 +196,9 @@ class OvisFigureOCRTask(BatchProcessor):
                         f"Encoded {len(figure_elements)} figure images as base64 (figure OCR failed but page OCR output preserved)"
                     )
                 except Exception as img_err:
-                    print(f"⚠️ Warning: Failed to encode figure images after OCR failure: {img_err}")
+                    print(
+                        f"⚠️ Warning: Failed to encode figure images after OCR failure: {img_err}"
+                    )
 
         return []
 
@@ -603,8 +605,7 @@ class OvisFigureOCRTask(BatchProcessor):
             raise RequestException(
                 message=(
                     "OvisFigureOCRTask requires a CUDA-equipped worker, but no GPU "
-                    "is available. Pick a cloud OCR backend (azure-di, textract, gemini) "
-                    "or run on a GPU host."
+                    "is available. Run on a GPU host."
                 )
             )
 

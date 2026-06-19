@@ -4,8 +4,17 @@ from typing import Any, Dict, List, Literal, Optional, Set, Tuple, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
-AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT = "AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT"
-AZURE_DOCUMENT_INTELLIGENCE_KEY = "AZURE_DOCUMENT_INTELLIGENCE_KEY"
+# PDF and image inputs accepted by this service (see file_converter.py).
+SUPPORTED_MIME_TYPES = frozenset(
+    {
+        "application/pdf",
+        "image/png",
+        "image/jpg",
+        "image/jpeg",
+        "image/heif",
+        "image/heic",
+    }
+)
 
 
 ### OUTPUT API FROM THE WORKFLOW #####
@@ -234,16 +243,13 @@ class ParsedDocument(BaseModel):
     structured_data: Optional[List[StructuredData]] = None
     total_pages: Optional[int] = None
     page_classes: Optional[List[PageClass]] = None
-    docx_converted_pdf_base64: Optional[str] = None  # For DOCX files converted to PDF
     document_markdown: Optional[str] = None  # Full document markdown representation
     filled_pdf_base64: Optional[str] = None
-    filled_docx_base64: Optional[str] = None
     form_filling_metadata: Optional[Dict[str, Any]] = None
 
 
 class Usage(BaseModel):
     pages_parsed: int
-    signature_detection: bool = Field(default=False)
     ocr_input_tokens_used: Optional[int] = None
     ocr_output_tokens_used: Optional[int] = None
     extraction_input_tokens_used: Optional[int] = None
@@ -268,7 +274,6 @@ class FormFillingRequest(BaseModel):
 
 class QuotaResourceType(str, Enum):
     PAGES_PARSED = "pages_parsed"
-    SIGNATURE_DETECTION = "signature_detection"
 
 
 class ResourceQuotaRequest(BaseModel):
@@ -347,13 +352,12 @@ class ParseRequest(BaseModel):
     file_name: str
     mime_type: str
     skew_correction: bool = False
-    detect_signature: bool = False
     detect_barcode: bool = False
     debug: bool = False
     chunk_strategy: Optional[str] = None
     table_parsing_strategy: Optional[Literal["tsr", "vlm"]] = "vlm"
     table_output_mode: Optional[Literal["html", "json", "markdown"]] = "markdown"
-    ocr_model: Optional[Literal["dots-ocr", "azure-di", "textract", "gemini"]] = "azure-di"
+    ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
     page_classification_request: Optional[ClassificationRequest] = None
     structured_extraction_requests: Optional[List[StructuredExtractionRequest]] = None
     disable_layout_detection: Optional[bool] = False

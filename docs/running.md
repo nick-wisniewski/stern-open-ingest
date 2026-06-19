@@ -1,31 +1,37 @@
 # Running the pipeline
 
-Three ways to run, same `ParseRequest` payload:
+We run this pipeline **ourselves** via the `--local` runner — each task executes
+in our own process/container, not on Tensorlake's hosted orchestration. See
+[`CLAUDE.md`](../CLAUDE.md) for how this fork is deployed and what we don't use.
 
-| Mode | Runner | When to use |
-|---|---|---|
-| **Local** (`--local`) | `run_local_application` | Reading/debugging code, iterating on a request, no Tensorlake account needed |
-| **Remote (Python)** | `run_remote_application` | Real workloads, large/parallel jobs, work that should survive your laptop closing |
-| **Remote (HTTP)** | `POST https://api.tensorlake.ai/applications/normalize_file_type_and_upload` | Calling the deployed workflow from a non-Python client (Node, Go, shell, another service) |
-
-You can prototype with `--local`, then drop the flag once you have keys and a deployed workflow. The HTTP path is documented in [`deployment.md`](deployment.md) §4.
+The `ParseRequest` object is the single API surface. `examples/parse_pdf.py` and
+`examples/extract_structured.py` build one and run it locally.
 
 ---
 
 ## 1. Install
 
 ```bash
-git clone https://github.com/tensorlakeai/OpenIngest
-cd OpenIngest
+git clone <your-fork-url> stern-open-ingest
+cd stern-open-ingest
 pip install -e .
 ```
 
-The `-e` (editable) flag means edits under `src/tensorlake_docai/` take effect immediately — no reinstall after each change.
+The `-e` (editable) flag means edits under `src/tensorlake_docai/` take effect
+immediately — no reinstall after each change.
 
 Optional dev tools:
 
 ```bash
 pip install -e ".[dev]"   # pytest, ruff, black
+```
+
+For the GPU OCR path you also need torch + transformers:
+
+```bash
+pip install -e ".[cpu]"   # CPU box (no GPU OCR)
+# pip install -e ".[gpu]"  # Linux CUDA box
+# pip install vllm          # additionally required for dots-ocr on a GPU box
 ```
 
 Sanity check:
@@ -39,109 +45,87 @@ pytest tests/ -q
 
 ## 2. Configure keys
 
-Only the providers you actually use need keys. The `.env.example` file groups them by feature.
-
-You can either source a `.env` file or `export` individual variables — both put the values in the environment your Python process inherits:
+Only the features you actually use need keys. The `.env.example` file groups them
+by feature.
 
 ```bash
-# Option A — .env file
 cp .env.example .env
 $EDITOR .env
 set -a; source .env; set +a
-
-# Option B — direct export
-export GEMINI_API_KEY=...
 ```
 
-`export` only lives in the current shell; new terminal = re-export.
+### Keys by feature
 
-### Keys by `ocr_model` 
-
-| `ocr_model` | Required env vars |
+| Feature | Required env vars |
 |---|---|
-| `gemini` | `GEMINI_API_KEY` |
-| `azure-di` | `AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT`, `AZURE_DOCUMENT_INTELLIGENCE_KEY` |
-| `textract` | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` |
-| `dots-ocr` | CUDA GPU — `--local` on your own CUDA host, or a managed Tensorlake GPU deployment (contact support@tensorlake.ai) |
+| `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
+| VLM enrichment + structured extraction | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
+| Table merging / page classification | `GEMINI_API_KEY` (default provider) or another LLM key |
+| `s3://` file inputs | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` (bare-key form only) |
 
-VLM enrichment and structured extraction additionally need one of: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`.
-
-`TENSORLAKE_API_KEY` is **only** required for remote runs (`tl deploy` and `run_remote_application`). Pure local runs do not need it.
-
-Missing keys silently disable the dependent feature — the rest of the pipeline keeps running.
+Missing keys silently disable the dependent feature — the rest of the pipeline
+keeps running.
 
 ---
 
 ## 2b. GPU pipeline (`dots-ocr`)
 
-`dots-ocr` runs both DotsOCR (layout + OCR) and Ovis2.5-9B (figure OCR) on a CUDA GPU. Two ways to host it: a `--local` Python process on your own CUDA-equipped host, or a managed Tensorlake GPU deployment. GPU workers aren't part of the open serverless tier today — contact support@tensorlake.ai if you'd like one provisioned.
+`dots-ocr` runs both DotsOCR (layout + OCR) and Ovis2.5-9B (figure OCR) on a
+CUDA GPU. Run a `--local` Python process on a CUDA-equipped host.
 
-**Worker setup.** The two GPU tasks (`DotsOCRTask` and `OvisFigureOCRTask`) declare `gpu=["H100", "A100-80GB"]` on their `@function(...)` decorators, so the code is ready for those pools as soon as you have access. If you need a different GPU type, edit the `GPU_MODELS` constant at the top of `src/tensorlake_docai/ocr/dots_ocr.py` and `src/tensorlake_docai/ocr/figure_ocr.py`.
+**Worker setup.** The two GPU tasks (`DotsOCRTask` and `OvisFigureOCRTask`)
+declare `gpu=["H100", "A100-80GB"]` on their `@function(...)` decorators. To
+target a different GPU type, edit the `GPU_MODELS` constant at the top of
+`src/tensorlake_docai/ocr/dots_ocr.py` and `src/tensorlake_docai/ocr/figure_ocr.py`.
+Both tasks raise a `RequestError` at startup if `torch.cuda.is_available()` is
+false, so misconfigurations fail fast.
 
-Both tasks raise a `RequestError` at startup if `torch.cuda.is_available()` returns false, so misconfigurations fail fast instead of stalling on a CPU container.
+**Model weights.** Both [rednote-hilab/dots.mocr](https://huggingface.co/rednote-hilab/dots.mocr)
+and [AIDC-AI/Ovis2.5-9B](https://huggingface.co/AIDC-AI/Ovis2.5-9B) are pulled
+from Hugging Face Hub on first cold-start (~25 GB).
 
-**Model weights.** Both [rednote-hilab/dots.mocr](https://huggingface.co/rednote-hilab/dots.mocr) and [AIDC-AI/Ovis2.5-9B](https://huggingface.co/AIDC-AI/Ovis2.5-9B) are pulled from Hugging Face Hub on first cold-start (~25 GB). The container caches them on its ephemeral disk for its lifetime. Both `@function(...)` decorators already set `min_containers=1, max_containers=1`, so one warm container amortizes the download across requests; raise `max_containers` if you need to absorb more concurrent traffic (each new container pays the cold-start).
-
-**Serving optimizations.** The `dots-ocr` path is where the repo's serving work lives: vLLM engine, two-stage Ovis classification → type-specific extraction (with guided decoding on the classifier), masked-region iterative retry when DotsOCR shows repetition on a page, and separate GPU containers for DotsOCR vs. Ovis figure OCR with batched in-task `vllm.generate()` calls across pages/figures. DotsOCR runs first and then routes to Ovis as a downstream task — they don't run in parallel, but they each get their own GPU container (`max_containers=1` on both), so one isn't starved by the other. See `src/tensorlake_docai/ocr/dots_ocr.py` and `src/tensorlake_docai/ocr/figure_ocr.py`.
-
-Skip this section entirely if you only plan to use `gemini`, `azure-di`, or `textract`.
+Skip this section if you are only iterating on non-OCR stages (structured extraction
+with `skip_ocr=True`, output formatting, etc.).
 
 ---
 
-## 3a. Run locally (no deploy)
+## 3. Run locally
 
 ```bash
-export GEMINI_API_KEY=...
-python examples/parse_pdf.py --file my.pdf --ocr-model gemini --local
+python examples/parse_pdf.py --file my.pdf --ocr-model dots-ocr --local
 ```
 
 What `--local` does:
 
-- Every `@function`/`@application` in `src/tensorlake_docai/` runs **in your current Python process**, sequentially.
-- External HTTP calls (Gemini, Azure, Textract, OpenAI, Anthropic) still happen for real — you just skip Tensorlake's cloud orchestrator.
-- `print(...)` and `breakpoint()` work normally; you see every routing decision in your terminal.
-- Single-process, single-machine — slow for large PDFs (>50 pages).
-- `dots-ocr` runs in-process too; you need a CUDA GPU on the host (the task raises a `RequestError` at startup if `torch.cuda.is_available()` is false).
+- Every `@function`/`@application` in `src/tensorlake_docai/` runs **in your
+  current Python process**, sequentially.
+- External HTTP calls (OpenAI, Anthropic, Gemini) still happen for real.
+- `print(...)` and `breakpoint()` work normally; you see every routing decision
+  in your terminal.
+- `dots-ocr` runs in-process too; you need a CUDA GPU on the host.
 
----
+Output: `./debug/document.json` plus one markdown file per chunk.
 
-## 3b. Run remotely
-
-```bash
-export TENSORLAKE_API_KEY=...
-# plus whatever provider keys your request will use
-
-tl deploy src/workflow.py
-python examples/parse_pdf.py --file my.pdf --ocr-model gemini
-```
-
-Remote mode hands the request to the Tensorlake control plane, which runs each task in its own container. Routing, retries, autoscaling (e.g. `@function(max_containers=200, ...)` in `file_converter.py`) only apply here.
-
-Re-deploy any time you change a file under `src/tensorlake_docai/`. Local mode doesn't need that — it re-imports on each invocation.
-
-See [`deployment.md`](deployment.md) for deploy mechanics, scaling knobs, and removing a deployment.
+Add `--draw-bboxes` to also write `debug/bbox_page_N.png` per page with fragment
+bounding boxes overlayed — handy for sanity-checking layout output.
 
 ---
 
 ## 4. Exercising more of the DAG
 
-Both example scripts construct a `ParseRequest` — that object is the single API surface. Every enrichment / detection stage is gated by a field on `ParseRequest` (defined in [`src/tensorlake_docai/pipeline/api.py`](../src/tensorlake_docai/pipeline/api.py)) and `examples/parse_pdf.py` exposes them as CLI flags. Run `python examples/parse_pdf.py --help` for the full list.
-
-### Just OCR
-
-```bash
-python examples/parse_pdf.py --file my.pdf --ocr-model gemini --local
-```
+Every enrichment / detection stage is gated by a field on `ParseRequest`
+(defined in [`src/tensorlake_docai/pipeline/api.py`](../src/tensorlake_docai/pipeline/api.py))
+and `examples/parse_pdf.py` exposes them as CLI flags. Run
+`python examples/parse_pdf.py --help` for the full list.
 
 ### OCR + VLM enrichment
 
 ```bash
 python examples/parse_pdf.py --file my.pdf --local \
-    --ocr-model gemini \
+    --ocr-model dots-ocr \
     --table-summarization \
     --figure-summarization \
-    --chart-extraction \
-    --detect-signature
+    --chart-extraction
 ```
 
 | Flag | Maps to `ParseRequest` field | Notes |
@@ -151,36 +135,28 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--table-cell-grounding` | `table_cell_grounding` | Per-cell bboxes |
 | `--figure-summarization` | `figure_summarization` | Pair with `--figure-summarization-prompt` |
 | `--figure-grounding` | `figure_grounding` | Bboxes for text regions inside figures |
-| `--figure-ocr-prompt` | `figure_ocr_prompt` | DotsOCR figure OCR prompt override (`dots-ocr` only) |
+| `--figure-ocr-prompt` | `figure_ocr_prompt` | DotsOCR figure OCR prompt override |
 | `--chart-extraction` | `chart_extraction` | Returns chart data as JSON |
 | `--key-value-extraction` | `key_value_extraction` | Form-region KV pairs |
-| `--detect-signature` | `detect_signature` | Textract-based; needs AWS keys |
 | `--detect-barcode` | `detect_barcode` | |
 | `--xpage-header-detection` | `xpage_header_detection` | Remove repeating headers/footers |
 
 ### OCR + structured extraction
 
-Use `examples/extract_structured.py`:
-
 ```bash
 python examples/extract_structured.py \
     --file invoice.pdf \
     --schema Invoice \
-    --ocr-model gemini \
-    --model-provider gemini \
+    --ocr-model dots-ocr \
+    --model-provider openai \
     --chunk-strategy page \
     --enable-citation \
     --local
 ```
 
-**Bringing your own schema.** You do **not** need to edit anything inside the
-`tensorlake_docai` package, and a new schema does **not** require `tl deploy` —
-the schema is serialized into the request as a JSON string, so remote workers
-see it without ever importing your Pydantic class. Re-deploys are only needed
-when you change code under `src/tensorlake_docai/`.
-
-Define a Pydantic `BaseModel` in your own code and pass its JSON schema to
-`StructuredExtractionRequest`:
+**Bringing your own schema.** Define a Pydantic `BaseModel` in your own code and
+pass its JSON schema to `StructuredExtractionRequest` — no edits inside the
+`tensorlake_docai` package needed:
 
 ```python
 import json
@@ -200,23 +176,22 @@ se_req = StructuredExtractionRequest(
 req = ParseRequest(file_url="s3://...", structured_extraction_requests=[se_req])
 ```
 
-The script `examples/extract_structured.py` shows the same wiring end-to-end. It
-defines `Invoice` and `Customer` locally, and imports `BankStatement` and
-`Receipt` from `tensorlake_docai.extraction.schema_collections` (a sample
-collection bundled with the SDK) — both patterns are valid. To try the example
-with your own model, add the class to `SCHEMA_REGISTRY` in that file so
-`--schema YourName` can find it; for production use, just pass your model into
-`StructuredExtractionRequest` directly as shown above.
+`examples/extract_structured.py` shows the same wiring end-to-end. It defines
+`Invoice` and `Customer` locally and imports `BankStatement` and `Receipt` from
+`tensorlake_docai.extraction.schema_collections`. Add a class to
+`SCHEMA_REGISTRY` in that file so `--schema YourName` can find it.
 
-`--skip-ocr` routes straight from `FILE_CONVERTOR → VLMExtractionTask`, skipping OCR entirely. Useful for screenshots and forms with poor OCR signal.
+`--skip-ocr` routes straight from `FILE_CONVERTOR → VLMExtractionTask`, skipping
+OCR entirely. Useful for screenshots and forms with poor OCR signal.
 
 ### Page classification
 
-`--classify NAME:DESCRIPTION` is repeatable; `--classification-type` defaults to `multi_label`.
+`--classify NAME:DESCRIPTION` is repeatable; `--classification-type` defaults to
+`multi_label`.
 
 ```bash
 python examples/parse_pdf.py --file my.pdf --local \
-    --ocr-model gemini \
+    --ocr-model dots-ocr \
     --classify invoice:"Has invoice header + line items" \
     --classify contract:"Legal terms, signature block" \
     --classification-type multi_class
@@ -226,7 +201,7 @@ python examples/parse_pdf.py --file my.pdf --local \
 
 ```bash
 python examples/parse_pdf.py --file my.pdf --local \
-    --ocr-model gemini \
+    --ocr-model dots-ocr \
     --pages 1 2 5 \
     --chunk-strategy page \
     --table-output-mode html \
@@ -243,7 +218,8 @@ python examples/parse_pdf.py --file my.pdf --local \
 
 ### Form filling
 
-Form filling needs a `FormFillingRequest` (richer than a single string), so it's not on `parse_pdf.py`'s CLI. Add it inline:
+Form filling needs a `FormFillingRequest`, so it's not on `parse_pdf.py`'s CLI.
+Add it inline:
 
 ```python
 from tensorlake_docai.pipeline.api import FormFillingRequest
@@ -253,7 +229,21 @@ ParseRequest(
 )
 ```
 
-Routes through the `FormFilling` task instead of the OCR branch. See `extraction/form_filling.py`.
+Routes through the `FormFilling` task instead of the OCR branch. See
+`extraction/form_filling.py`.
+
+### File inputs
+
+`ParseRequest` accepts the file in one of two mutually-exclusive forms:
+
+| Field | Use it when… | Value |
+|---|---|---|
+| `file_bytes` | the file lives on local disk | base64-encoded raw bytes (string) |
+| `file_url` | the file is in S3 or reachable over HTTP(S) | `"s3://my-bucket/key.pdf"` or `"https://example.com/inv.pdf"` |
+
+`file_name` and `mime_type` are required in both cases. `s3://` URLs work either
+as `s3://my-bucket/key.pdf` (bucket in URL) or `s3://key.pdf` (bare key, needs
+`S3_BUCKET_NAME`).
 
 ---
 
@@ -263,14 +253,15 @@ Both examples produce a `ParsedDocument` (`pipeline/api.py`):
 
 | Field | Contents |
 |---|---|
-| `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/signature/...), bounding boxes, `ref_id`s |
+| `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...), bounding boxes, `ref_id`s |
 | `chunks[]` | Flattened content per `chunk_strategy` |
 | `structured_data` | Schema-extracted JSON |
 | `page_classes[]` | Classification results |
 | `merged_tables[]` | Cross-page table stitching |
 | `usage` | Token counts per stage (OCR / VLM / extraction / header correction) |
 
-`parse_pdf.py` writes `./debug/document.json` plus one markdown file per chunk. `extract_structured.py` prints `structured_data` to stdout.
+`parse_pdf.py` writes `./debug/document.json` plus one markdown file per chunk.
+`extract_structured.py` prints `structured_data` to stdout.
 
 ---
 
@@ -282,4 +273,6 @@ pytest tests/test_pipeline_routing.py -v  # one passing test per DAG branch
 pytest tests/test_routing.py -v
 ```
 
-`tests/test_pipeline_routing.py` is the most useful file to skim once — every routing predicate has a test that shows the exact `ParseRequest` fields that send a request down each branch.
+`tests/test_pipeline_routing.py` is the most useful file to skim once — every
+routing predicate has a test that shows the exact `ParseRequest` fields that send
+a request down each branch.

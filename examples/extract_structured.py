@@ -76,8 +76,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--ocr-model",
-        default="azure-di",
-        choices=["dots-ocr", "azure-di", "textract", "gemini"],
+        default="dots-ocr",
+        choices=["dots-ocr"],
     )
     parser.add_argument(
         "--model-provider",

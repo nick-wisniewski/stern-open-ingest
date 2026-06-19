@@ -1,8 +1,8 @@
 # SPDX-License-Identifier: Apache-2.0
 #!/usr/bin/env python3
 """
-Gemini Header Correction Service
-Service for correcting document header hierarchy levels using Google's Gemini AI.
+Header Correction Service
+Corrects document header hierarchy levels using an OpenAI model.
 """
 
 import json
@@ -16,8 +16,6 @@ from tensorlake_docai.models.intermediate_objects import ParseResult
 from tensorlake_docai.providers.model_provider_utils import get_openai_sync_client_and_model
 from tensorlake.applications import RequestError as RequestException
 
-# OpenAI API Configuration (used when USE_AZURE_OPENAI != "true";
-# for Azure, the deployment name from AZURE_OPENAI_MODEL_DEPLOYMENT_NAME is used instead)
 OPENAI_HEADER_CORRECTION_MODEL_NAME = "gpt-4.1"
 
 
