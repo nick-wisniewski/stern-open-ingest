@@ -218,7 +218,7 @@ def main() -> None:
     forms.add_argument(
         "--key-value-extraction",
         action="store_true",
-        help="Extract key-value pairs from form-like regions",
+        help="Extract key-value pairs from detected document regions",
     )
 
     classify = parser.add_argument_group("page classification")

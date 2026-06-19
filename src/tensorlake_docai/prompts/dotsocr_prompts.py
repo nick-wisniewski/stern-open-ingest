@@ -89,8 +89,8 @@ FIGURE_DIAGRAM_EXTRACTION_PROMPT = (
 )
 
 
-FIGURE_FORM_EXTRACTION_PROMPT = (
-    "Read this form and extract all visible fields.\n\n"
+FIGURE_KEY_VALUE_EXTRACTION_PROMPT = (
+    "Read this document region and extract all visible key-value fields.\n\n"
     "Return HTML only.\n"
     "Use one or more <table> elements.\n"
     "Each row must be exactly:\n"
@@ -104,7 +104,7 @@ FIGURE_FORM_EXTRACTION_PROMPT = (
     "- If none are selected, output: empty\n"
     "- For a single checkbox, output: checked or empty\n"
     "- For dates split across boxes, merge into one value.\n"
-    "- For table-like regions in the form, flatten each row into field/value pairs.\n"
+    "- For table-like regions, flatten each row into field/value pairs.\n"
     "- Do not explain anything.\n"
     "- Do not include markdown fences.\n"
     "- Do not output text outside HTML.\n\n"

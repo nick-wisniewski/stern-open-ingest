@@ -728,8 +728,6 @@ def collect_figure_inputs_from_page(
     page_num,
     keep_all_figures: bool = False,
     figure_prompt: str = "",
-    form_prompt: str = "",
-    form_coverage_threshold: float = 0.6,
 ):
     """
     Collect figure inputs from a single page for batch processing.
@@ -741,9 +739,7 @@ def collect_figure_inputs_from_page(
         scale_factor: Scale factor for coordinate conversion
         page_num: Page number
         keep_all_figures: When True, include all figures regardless of size
-        figure_prompt: Prompt to use for small figure text extraction
-        form_prompt: Prompt to use for large figures (likely forms). If empty, uses figure_prompt for all.
-        form_coverage_threshold: Coverage threshold above which to use form_prompt (default: 0.6 = 60%)
+        figure_prompt: Prompt to use for figure text extraction
     """
     import numpy as np
     from PIL import Image
@@ -800,19 +796,7 @@ def collect_figure_inputs_from_page(
 
             cropped_img = Image.fromarray(img_arr[y1:y2, x1:x2])
 
-            # Decide which prompt to use based on figure coverage
-            element_area = (pdf_bbox[2] - pdf_bbox[0]) * (pdf_bbox[3] - pdf_bbox[1])
-            coverage = element_area / total_area if total_area > 0 else 0
-
-            # Use form prompt for large figures if provided, otherwise use figure prompt
-            if form_prompt and coverage > form_coverage_threshold:
-                selected_prompt = form_prompt
-                print(f"  Page {page_num} Figure {i}: Using FORM prompt (coverage: {coverage:.1%})")
-            else:
-                selected_prompt = figure_prompt
-
-            # Prepare prompt with selected prompt
-            prompt = f"<|img|><|imgpad|><|endofimg|>{selected_prompt}" if selected_prompt else ""
+            prompt = f"<|img|><|imgpad|><|endofimg|>{figure_prompt}" if figure_prompt else ""
             batch_input = {"prompt": prompt, "multi_modal_data": {"image": cropped_img}}
 
             batch_inputs.append(batch_input)

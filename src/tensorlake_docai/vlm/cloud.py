@@ -27,8 +27,8 @@ from tensorlake_docai.pipeline.routing import (
 )
 from tensorlake_docai.pipeline.simple_page_creator import ImageDimensions
 from tensorlake_docai.pipeline.output_formatter import format_final_output
-from tensorlake_docai.extraction.form_extraction_utils import (
-    run_element_form_extraction_and_modify_page_elements,
+from tensorlake_docai.extraction.key_value_extraction_utils import (
+    run_element_key_value_extraction_and_modify_page_elements,
 )
 from tensorlake_docai.tables.table_cell_grounding_utils import (
     run_element_table_cell_grounding_and_modify_page_elements,
@@ -300,7 +300,7 @@ class VLMExtractionTask(BatchProcessor):
         self.figure_grounding_input_tokens += input_tokens
         self.figure_grounding_output_tokens += output_tokens
 
-    async def _run_form_extraction(
+    async def _run_key_value_extraction(
         self,
         parse_result,
         page_images_dict,
@@ -313,13 +313,13 @@ class VLMExtractionTask(BatchProcessor):
             page_images_dict,
             element_types,
             element_types_to_check,
-            run_element_form_extraction_and_modify_page_elements,
-            "form extraction",
+            run_element_key_value_extraction_and_modify_page_elements,
+            "key-value extraction",
             scale_factor,
         )
-        # Track form extraction token usage
-        self.form_extraction_input_tokens += input_tokens
-        self.form_extraction_output_tokens += output_tokens
+        # Track key-value extraction token usage
+        self.key_value_extraction_input_tokens += input_tokens
+        self.key_value_extraction_output_tokens += output_tokens
 
     async def _summarize_single_page(
         self,
@@ -483,7 +483,7 @@ class VLMExtractionTask(BatchProcessor):
             )
 
         if current_request.key_value_extraction:
-            await self._run_form_extraction(
+            await self._run_key_value_extraction(
                 self._current_parse_result,
                 page_images_dict,
                 FORM_FRAGMENT_TYPES,
@@ -623,8 +623,8 @@ class VLMExtractionTask(BatchProcessor):
         self.chart_extraction_output_tokens = 0
         self.table_extraction_input_tokens = 0
         self.table_extraction_output_tokens = 0
-        self.form_extraction_input_tokens = 0
-        self.form_extraction_output_tokens = 0
+        self.key_value_extraction_input_tokens = 0
+        self.key_value_extraction_output_tokens = 0
         self.figure_grounding_input_tokens = 0
         self.figure_grounding_output_tokens = 0
 
@@ -662,7 +662,7 @@ class VLMExtractionTask(BatchProcessor):
             parse_result.usage.summarization_input_tokens_used = (
                 self.summarization_input_tokens
                 + self.chart_extraction_input_tokens
-                + self.form_extraction_input_tokens
+                + self.key_value_extraction_input_tokens
                 + self.table_extraction_input_tokens
                 + self.figure_grounding_input_tokens
                 + self.page_classification_input_tokens
@@ -670,7 +670,7 @@ class VLMExtractionTask(BatchProcessor):
             parse_result.usage.summarization_output_tokens_used = (
                 self.summarization_output_tokens
                 + self.chart_extraction_output_tokens
-                + self.form_extraction_output_tokens
+                + self.key_value_extraction_output_tokens
                 + self.table_extraction_output_tokens
                 + self.figure_grounding_output_tokens
                 + self.page_classification_output_tokens
@@ -683,13 +683,13 @@ class VLMExtractionTask(BatchProcessor):
                 pages_parsed=0,  # Will be set by other workflow components
                 summarization_input_tokens_used=self.summarization_input_tokens
                 + self.chart_extraction_input_tokens
-                + self.form_extraction_input_tokens
+                + self.key_value_extraction_input_tokens
                 + self.table_extraction_input_tokens
                 + self.figure_grounding_input_tokens
                 + self.page_classification_input_tokens,
                 summarization_output_tokens_used=self.summarization_output_tokens
                 + self.chart_extraction_output_tokens
-                + self.form_extraction_output_tokens
+                + self.key_value_extraction_output_tokens
                 + self.table_extraction_output_tokens
                 + self.figure_grounding_output_tokens
                 + self.page_classification_output_tokens,

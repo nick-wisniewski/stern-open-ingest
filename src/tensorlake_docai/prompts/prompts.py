@@ -32,13 +32,13 @@ Return only extracted information in markdown format without additional commenta
 """
 
 
-FORM_EXTRACTOR_USER_PROMPT = """[INST] Extract information from the document fragment:
+KEY_VALUE_EXTRACTOR_USER_PROMPT = """[INST] Extract information from the document fragment:
 
 * If it is a table, extract the table data into a structured markdown format, along with table title and caption. 
 * If it is a graph or chart, describe it in detail.
 * If it contains printed or handwritten text, extract all the text.
 * If there are radio boxes or checkboxes, only include the text around the checkbox thats checked or marked. If none of the checkboxes are checked, return an empty string.
-* If it is a form, extract the form data into a structured markdown format, with question and answer pairs.
+* If it contains labeled fields or key-value pairs, extract them into structured markdown with question and answer pairs.
 Don't add ```text or ```markdown in the output.
 [/INST]
 """
@@ -333,19 +333,18 @@ TABLE_CORRECTION_PROMPTS = {
     'The output is in JSON with a "corrected_html" field and an "explanation" field.',
 }
 
-FORM_PROMPTS = {
+KEY_VALUE_PROMPTS = {
     "detection": {
-        "system": "You are an expert at detecting forms in images.",
-        "user": "Analyze this image and determine if it is a form. "
-        "A form is a document with labeled fields for user input (e.g. text boxes, checkboxes, radio buttons). "
-        "Return a JSON object with a single boolean field 'is_form'.",
+        "system": "You are an expert at detecting key-value regions in document images.",
+        "user": "Analyze this image and determine if it contains labeled fields or key-value pairs. "
+        "Return a JSON object with a single boolean field 'is_key_value_region'.",
     },
     "extraction": {
-        "system": "You are an expert at extracting data from forms.",
-        "user": "Extract the information from this form. Represent key-value pairs clearly. "
+        "system": "You are an expert at extracting key-value data from document regions.",
+        "user": "Extract the information from this region. Represent key-value pairs clearly. "
         "For checkboxes/radio buttons, indicate their state (e.g., [x] for checked, [ ] for unchecked). "
-        "Consider the context of the form fields and radio buttons when processing the form image. "
-        "Preserve the structure and order of the form as much as possible.",
+        "Consider field labels and surrounding context when processing the image. "
+        "Preserve the structure and order as much as possible.",
     },
 }
 
@@ -370,24 +369,6 @@ def get_element_summary_prompt(element_types: list[PageFragmentType], has_page_i
         return TABLE_SUMMARY_USER_PROMPT if has_page_image else TABLE_SUMMARY_USER_PROMPT_NO_PAGE
 
 
-# Update form to html prompt to handle itypical forms that only have key or value
-QWEN_FORM_TO_HTML_SYSTEM_PROMPT = """You are an AI specialized in recognizing and extracting text from images. Your mission is to analyze the image document and generate the result in QwenVL Document Parser HTML format using specified tags while maintaining user privacy and data integrity."""
-QWEN_FORM_TO_HTML_PROMPT = """Analyze the provided image and Extract ONLY the visible text and convert to HTML. Return ONLY HTML code. Follow these strict rules:
-
-1. For form regions with key-value pairs:
-   - Use definition lists: `<dl>`, `<dt>` for keys, and `<dd>` for values
-   - For standalone values without keys, use `<dd class="standalone">`
-   - For keys without values, use `<dt class="no-value">`
-   - Preserve visual grouping with `<div class="form-section">` when appropriate
-
-2. For tabular data, use <table>, <tr>, <th>, <td> tags.
-
-- Extract TEXT ONLY - no placeholders for visual elements
-- Only include text actually visible in the image
-- Do NOT include any comments, explanations, or non-HTML syntax
-"""
-
-
 QWEN_TABLE_TO_MARKDOWN_SYSTEM_PROMPT = "You are an AI assistant specialized in recognizing and extracting text from images. Your mission is to analyze the image and generate result in markdown and only use the text in the image."
 QWEN_TABLE_TO_MARKDOWN_PROMPT = "Convert the document fragment to markdown. Do not include the text not on the image, do not include other outputs."
 
@@ -402,7 +383,7 @@ def get_prompt_messages(cls: PageFragmentType) -> list[str]:
     elif cls in [PageFragmentType.FIGURE, PageFragmentType.FORMULA]:
         return [FIGURE_EXTRACTOR_SYSTEM_PROMPT, FIGURE_EXTRACTOR_USER_PROMPT]
     elif cls in [PageFragmentType.FORM, PageFragmentType.KEY_VALUE_REGION]:
-        return [TABLE_EXTRACTOR_SYSTEM_PROMPT, FORM_EXTRACTOR_USER_PROMPT]
+        return [TABLE_EXTRACTOR_SYSTEM_PROMPT, KEY_VALUE_EXTRACTOR_USER_PROMPT]
     elif cls in [PageFragmentType.DOCUMENT_INDEX]:
         return [DOCUMENT_INDEX_SYSTEM_PROMPT, DOCUMENT_INDEX_USER_PROMPT]
     elif cls in [
@@ -442,5 +423,5 @@ def get_table_correction_prompt_messages(additional_prompt: str | None = None) -
     return TABLE_CORRECTION_PROMPTS["system"], TABLE_CORRECTION_PROMPTS["user"]
 
 
-def get_form_prompt_messages(task: str) -> list[str]:
-    return _get_prompt_messages_from_dict(task, FORM_PROMPTS, "form")
+def get_key_value_prompt_messages(task: str) -> list[str]:
+    return _get_prompt_messages_from_dict(task, KEY_VALUE_PROMPTS, "key-value extraction")

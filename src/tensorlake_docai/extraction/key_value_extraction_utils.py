@@ -1,21 +1,22 @@
 # SPDX-License-Identifier: Apache-2.0
 """
-Form extraction utilities.
+Key-value extraction utilities for rendering detected regions as Markdown.
 """
 
 import asyncio
 import json
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
+
 from PIL import Image
 
-from tensorlake_docai.pipeline.api import PageFragmentType
-from tensorlake_docai.models.layout_objects import PageLayoutElement
-from tensorlake_docai.prompts.prompts import get_form_prompt_messages
 from tensorlake_docai.models.intermediate_objects import ParseResult
+from tensorlake_docai.models.layout_objects import PageLayoutElement
+from tensorlake_docai.pipeline.api import PageFragmentType
+from tensorlake_docai.prompts.prompts import get_key_value_prompt_messages
 
 
-def convert_form_json_to_markdown(content: str) -> str:
-    """Convert form JSON content to Markdown."""
+def convert_key_value_json_to_markdown(content: str) -> str:
+    """Convert key-value JSON content to Markdown."""
     try:
         if isinstance(content, str):
             data = json.loads(content)
@@ -31,7 +32,7 @@ def convert_form_json_to_markdown(content: str) -> str:
         elif isinstance(data, list):
             for item in data:
                 if isinstance(item, dict):
-                    # Specific schema from form_extraction_utils
+                    # Specific schema used by key-value extraction.
                     if "field_name" in item and "value" in item:
                         box_id = item.get("box_id", "")
                         name = item.get("field_name", "")
@@ -46,7 +47,6 @@ def convert_form_json_to_markdown(content: str) -> str:
                         line = f"{line}: {val}"
                         md_lines.append(line)
                     else:
-                        # Generic fallback
                         k = (
                             item.get("key")
                             or item.get("field")
@@ -80,7 +80,7 @@ def convert_form_json_to_markdown(content: str) -> str:
         return content if isinstance(content, str) else str(content)
 
 
-async def run_element_form_extraction_and_modify_page_elements(
+async def run_element_key_value_extraction_and_modify_page_elements(
     cropped_images: List[Image.Image],
     page_elements: List[PageLayoutElement],
     element_types: List[PageFragmentType],
@@ -116,19 +116,17 @@ async def _process_single_element(
     input_tokens = 0
     output_tokens = 0
 
-    is_form = False
+    is_key_value_region = False
 
-    # If element is already a target type (FORM), proceed to extraction
     if element.fragment_type in target_types:
-        is_form = True
-    # If element is in check types (FIGURE), run detection
+        is_key_value_region = True
     elif element.fragment_type in check_types:
-        _, user_prompt = get_form_prompt_messages("detection")
+        _, user_prompt = get_key_value_prompt_messages("detection")
         json_schema = json.dumps(
             {
                 "type": "object",
-                "properties": {"is_form": {"type": "boolean"}},
-                "required": ["is_form"],
+                "properties": {"is_key_value_region": {"type": "boolean"}},
+                "required": ["is_key_value_region"],
             }
         )
 
@@ -144,15 +142,14 @@ async def _process_single_element(
             output_tokens += out_tok
 
             result = json.loads(response_text)
-            if result.get("is_form", False):
-                is_form = True
-                # Update fragment type to FORM
+            if result.get("is_key_value_region", False):
+                is_key_value_region = True
                 element.fragment_type = PageFragmentType.FORM
         except Exception as e:
-            print(f"Form detection failed: {e}", flush=True)
+            print(f"Key-value region detection failed: {e}", flush=True)
 
-    if is_form:
-        _, user_prompt = get_form_prompt_messages("extraction")
+    if is_key_value_region:
+        _, user_prompt = get_key_value_prompt_messages("extraction")
 
         extraction_schema = json.dumps(
             {
@@ -162,17 +159,17 @@ async def _process_single_element(
                     "properties": {
                         "box_id": {
                             "type": "string",
-                            "description": "The box id of the form field, if present. Empty string if not available.",
+                            "description": "The box id of the field, if present. Empty string if not available.",
                         },
                         "field_name": {
                             "type": "string",
-                            "description": "The name or context of the form field",
+                            "description": "The name or context of the field",
                         },
                         "type": {
                             "type": "string",
-                            "description": "The type of the form field, e.g. text, checkbox, radio button",
+                            "description": "The field type, e.g. text, checkbox, radio button",
                         },
-                        "value": {"type": "string", "description": "The value of the form field"},
+                        "value": {"type": "string", "description": "The field value"},
                     },
                     "required": ["field_name", "type", "value"],
                 },
@@ -190,15 +187,11 @@ async def _process_single_element(
             input_tokens += in_tok
             output_tokens += out_tok
 
-            # Convert JSON to markdown for element.markdown
-            markdown_response_text = convert_form_json_to_markdown(response_text)
-
-            # Update element content
             element.ocr_text = response_text
             element.html = ""
-            element.markdown = markdown_response_text
+            element.markdown = convert_key_value_json_to_markdown(response_text)
 
         except Exception as e:
-            print(f"Form extraction failed: {e}", flush=True)
+            print(f"Key-value extraction failed: {e}", flush=True)
 
     return input_tokens, output_tokens

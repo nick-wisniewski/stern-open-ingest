@@ -137,7 +137,7 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--figure-grounding` | `figure_grounding` | Bboxes for text regions inside figures |
 | `--figure-ocr-prompt` | `figure_ocr_prompt` | DotsOCR figure OCR prompt override |
 | `--chart-extraction` | `chart_extraction` | Returns chart data as JSON |
-| `--key-value-extraction` | `key_value_extraction` | Form-region KV pairs |
+| `--key-value-extraction` | `key_value_extraction` | Key-value region markdown extraction |
 | `--detect-barcode` | `detect_barcode` | |
 | `--xpage-header-detection` | `xpage_header_detection` | Remove repeating headers/footers |
 
