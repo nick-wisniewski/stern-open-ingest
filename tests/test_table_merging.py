@@ -33,7 +33,7 @@ from tensorlake_docai.pipeline.api import (
 def _make_table_fragment(html: str = "<table></table>", bbox=None) -> PageFragment:
     return PageFragment(
         fragment_type=PageFragmentType.TABLE,
-        content=Table(content="", cells=[], html=html),
+        content=Table(content="", html=html),
         bbox=bbox,
     )
 

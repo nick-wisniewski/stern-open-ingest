@@ -13,7 +13,6 @@ AWS Textract, Google Gemini) have been removed. Select the backend via
 | Capability | Support |
 |---|---|
 | Native PDF | converts pages to images first |
-| Cell bounding boxes | ✅ |
 | Forms / key-value | ✅ |
 | Barcodes | ✅ |
 | Custom figure-OCR prompt | ✅ |

@@ -30,12 +30,6 @@ from tensorlake_docai.pipeline.output_formatter import format_final_output
 from tensorlake_docai.extraction.key_value_extraction_utils import (
     run_element_key_value_extraction_and_modify_page_elements,
 )
-from tensorlake_docai.tables.table_cell_grounding_utils import (
-    run_element_table_cell_grounding_and_modify_page_elements,
-)
-from tensorlake_docai.vlm.figure_grounding_utils import (
-    run_element_figure_grounding_and_modify_page_elements,
-)
 from tensorlake_docai.ocr.utils import BatchProcessor
 
 PADDING = 4
@@ -60,11 +54,6 @@ TEXT_FRAGMENT_TYPES = [
     PageFragmentType.PAGE_FOOTER,
     PageFragmentType.PAGE_HEADER,
     PageFragmentType.PAGE_NUMBER,
-]
-
-TABLE_FRAGMENT_TYPES = [
-    PageFragmentType.TABLE,
-    PageFragmentType.DOCUMENT_INDEX,
 ]
 
 FORM_FRAGMENT_TYPES = [
@@ -260,46 +249,6 @@ class VLMExtractionTask(BatchProcessor):
         self.chart_extraction_input_tokens += input_tokens
         self.chart_extraction_output_tokens += output_tokens
 
-    async def _run_table_cell_grounding(
-        self,
-        parse_result,
-        page_images_dict,
-        element_types,
-        element_types_to_check,
-        scale_factor=1.0,
-    ):
-        input_tokens, output_tokens = await self._run_extraction_common(
-            parse_result,
-            page_images_dict,
-            element_types,
-            element_types_to_check,
-            run_element_table_cell_grounding_and_modify_page_elements,
-            "table cell grounding",
-            scale_factor,
-        )
-        # Track table extraction token usage
-        self.table_extraction_input_tokens += input_tokens
-        self.table_extraction_output_tokens += output_tokens
-
-    async def _run_figure_grounding(
-        self, parse_result, page_images_dict, element_types, scale_factor=1.0
-    ):
-        input_tokens, output_tokens = await self._run_extraction_common(
-            parse_result,
-            page_images_dict,
-            element_types,
-            [],  # no element types to check, only figures
-            run_element_figure_grounding_and_modify_page_elements,
-            "figure grounding",
-            scale_factor,
-        )
-        # Track figure grounding token usage
-        if not hasattr(self, "figure_grounding_input_tokens"):
-            self.figure_grounding_input_tokens = 0
-            self.figure_grounding_output_tokens = 0
-        self.figure_grounding_input_tokens += input_tokens
-        self.figure_grounding_output_tokens += output_tokens
-
     async def _run_key_value_extraction(
         self,
         parse_result,
@@ -491,23 +440,6 @@ class VLMExtractionTask(BatchProcessor):
                 scale_factor,
             )
 
-        if current_request.table_cell_grounding:
-            await self._run_table_cell_grounding(
-                self._current_parse_result,
-                page_images_dict,
-                TABLE_FRAGMENT_TYPES + [PageFragmentType.TEXT],
-                [],
-                scale_factor,
-            )
-
-        if current_request.figure_grounding:
-            await self._run_figure_grounding(
-                self._current_parse_result,
-                page_images_dict,
-                [PageFragmentType.FIGURE],
-                scale_factor,
-            )
-
         # Process page classification for this batch
         if current_request.page_classification_request:
             await self._process_page_classification_batch(page_images_dict, batch_number)
@@ -621,21 +553,15 @@ class VLMExtractionTask(BatchProcessor):
         self.page_classification_output_tokens = 0
         self.chart_extraction_input_tokens = 0
         self.chart_extraction_output_tokens = 0
-        self.table_extraction_input_tokens = 0
-        self.table_extraction_output_tokens = 0
         self.key_value_extraction_input_tokens = 0
         self.key_value_extraction_output_tokens = 0
-        self.figure_grounding_input_tokens = 0
-        self.figure_grounding_output_tokens = 0
 
         # Determine if any VLM task requires page images.
         needs_images = (
             parse_result.request.table_summarization
             or parse_result.request.figure_summarization
             or parse_result.request.chart_extraction
-            or parse_result.request.table_cell_grounding
             or parse_result.request.key_value_extraction
-            or parse_result.request.figure_grounding
             or parse_result.request.page_classification_request
         )
 
@@ -663,16 +589,12 @@ class VLMExtractionTask(BatchProcessor):
                 self.summarization_input_tokens
                 + self.chart_extraction_input_tokens
                 + self.key_value_extraction_input_tokens
-                + self.table_extraction_input_tokens
-                + self.figure_grounding_input_tokens
                 + self.page_classification_input_tokens
             )
             parse_result.usage.summarization_output_tokens_used = (
                 self.summarization_output_tokens
                 + self.chart_extraction_output_tokens
                 + self.key_value_extraction_output_tokens
-                + self.table_extraction_output_tokens
-                + self.figure_grounding_output_tokens
                 + self.page_classification_output_tokens
             )
         else:
@@ -684,14 +606,10 @@ class VLMExtractionTask(BatchProcessor):
                 summarization_input_tokens_used=self.summarization_input_tokens
                 + self.chart_extraction_input_tokens
                 + self.key_value_extraction_input_tokens
-                + self.table_extraction_input_tokens
-                + self.figure_grounding_input_tokens
                 + self.page_classification_input_tokens,
                 summarization_output_tokens_used=self.summarization_output_tokens
                 + self.chart_extraction_output_tokens
                 + self.key_value_extraction_output_tokens
-                + self.table_extraction_output_tokens
-                + self.figure_grounding_output_tokens
                 + self.page_classification_output_tokens,
             )
 

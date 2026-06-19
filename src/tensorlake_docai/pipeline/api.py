@@ -144,12 +144,6 @@ class Signature(BaseModel):
     content: Optional[str] = None
 
 
-class TableCell(BaseModel):
-    text: str
-    bounding_box: dict[str, float]
-    ref_id: Optional[str] = None  # Format: page.reading_order.cell_index
-
-
 class ListItem(BaseModel):
     content: str
 
@@ -157,7 +151,6 @@ class ListItem(BaseModel):
 class Table(BaseModel):
     content: str
     summary: Optional[str] = None
-    cells: List[TableCell]
     html: Optional[str] = None
     markdown: Optional[str] = None
     table_checked: Optional[bool] = False  # Checked and processed through table correction
@@ -167,7 +160,6 @@ class Figure(BaseModel):
     content: str
     summary: Optional[str] = None
     image_base64: Optional[str] = None  # Base64-encoded image data for rendering
-    text_bounding_boxes: Optional[List[TableCell]] = None
 
 
 class Chart(BaseModel):
@@ -329,8 +321,6 @@ class ParseRequest(BaseModel):
     figure_ocr_prompt: Optional[str] = None  # For automatic figure OCR in the `dots-ocr` path
     # This is to make the full page image in table and figure summarization optional
     chart_extraction: Optional[bool] = False
-    table_cell_grounding: Optional[bool] = False
-    figure_grounding: Optional[bool] = False
     key_value_extraction: Optional[bool] = False
     include_full_page_image: Optional[bool] = False
     ignore_sections: Optional[Set[PageFragmentType]] = None

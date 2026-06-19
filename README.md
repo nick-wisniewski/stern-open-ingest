@@ -105,7 +105,6 @@ python examples/parse_pdf.py --file my.pdf --ocr-model dots-ocr --local
 ```
 
 Results land in `./debug/` (`document.json` plus one markdown file per chunk).
-Add `--draw-bboxes` to also write per-page PNGs with fragment bounding boxes.
 
 Full walkthrough — every `ParseRequest` flag, VLM enrichment, page
 classification, and file input mode — is in [`docs/running.md`](docs/running.md).

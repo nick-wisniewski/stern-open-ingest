@@ -11,7 +11,6 @@ from tensorlake_docai.pipeline.api import (
     Table,
     Figure,
     ListItem,
-    TableCell,
     Signature,
     SectionHeader,
     ParseRequest,
@@ -187,7 +186,7 @@ def document_to_markdown(pages: List[Page], request: ParseRequest) -> str:
     return text
 
 
-def downsample_bbox_coordinates_for_parsed_output(bbox, scale_factor):
+def _downsample_bbox_coordinates(bbox, scale_factor):
     if bbox is None:
         return bbox
 
@@ -198,7 +197,7 @@ def downsample_bbox_coordinates_for_parsed_output(bbox, scale_factor):
     return scaled_bbox
 
 
-def bbox_to_dict(bbox: Tuple[float, float, float, float]) -> Dict[str, float]:
+def _bbox_to_dict(bbox: Tuple[float, float, float, float]) -> Dict[str, float]:
     return {"x1": bbox[0], "y1": bbox[1], "x2": bbox[2], "y2": bbox[3]}
 
 
@@ -264,25 +263,8 @@ def document_layout_to_document(
                 PageFragmentType.KEY_VALUE_REGION,
                 PageFragmentType.FORM,
             ]:
-                cells = []
-                for text_bounding_box in page_element.text_bounding_boxes or []:
-                    cells.append(
-                        TableCell(
-                            text=text_bounding_box.text,
-                            bounding_box=downsample_bbox_coordinates_for_parsed_output(
-                                bbox_to_dict(text_bounding_box.bbox),
-                                scale_factor,
-                            ),
-                            ref_id=(
-                                text_bounding_box.ref_id
-                                if hasattr(text_bounding_box, "ref_id")
-                                else None
-                            ),
-                        )
-                    )
                 parsed_content = Table(
                     content=content,
-                    cells=cells,
                     html=page_element.html,
                     markdown=page_element.markdown,
                     summary=page_element.llm_summary,
@@ -300,28 +282,12 @@ def document_layout_to_document(
                     content=content,
                 )
             elif page_element.fragment_type == PageFragmentType.FIGURE:
-                # Convert text_bounding_boxes to TableCell list if present
-                figure_text_bboxes = None
-                if page_element.text_bounding_boxes:
-                    figure_text_bboxes = []
-                    for text_bbox in page_element.text_bounding_boxes:
-                        figure_text_bboxes.append(
-                            TableCell(
-                                text=text_bbox.text,
-                                bounding_box=downsample_bbox_coordinates_for_parsed_output(
-                                    bbox_to_dict(text_bbox.bbox), scale_factor
-                                ),
-                                ref_id=text_bbox.ref_id if hasattr(text_bbox, "ref_id") else None,
-                            )
-                        )
-
                 parsed_content = Figure(
                     content=content,
                     summary=page_element.llm_summary,
                     image_base64=(
                         page_element.image_base64 if hasattr(page_element, "image_base64") else None
                     ),
-                    text_bounding_boxes=figure_text_bboxes,
                 )
             elif page_element.fragment_type == PageFragmentType.CHART:
                 parsed_content = Chart(
@@ -342,8 +308,8 @@ def document_layout_to_document(
                 PageFragment(
                     fragment_type=page_element.fragment_type,
                     content=parsed_content,
-                    bbox=downsample_bbox_coordinates_for_parsed_output(
-                        bbox_to_dict(page_element.bbox), scale_factor
+                    bbox=_downsample_bbox_coordinates(
+                        _bbox_to_dict(page_element.bbox), scale_factor
                     ),
                     reading_order=page_element.reading_order,
                     ref_id=page_element.ref_id if hasattr(page_element, "ref_id") else None,
@@ -403,7 +369,6 @@ def document_layout_to_document(
 
                     table_content = Table(
                         content=mt.merged_table_html,
-                        cells=[],
                         html=mt.merged_table_html,
                         markdown=mt_markdown,
                         summary=mt.summary,

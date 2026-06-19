@@ -83,5 +83,8 @@ def _calculate_usage(
 
 def _create_final_output(parsed_document: ParsedDocument, usage: Usage) -> Optional[dict]:
     """Create the final ParsedDocumentRef output."""
-    output = ParsedDocumentRef(document=parsed_document.model_dump(), usage=usage).model_dump()
+    document = parsed_document.model_dump(
+        exclude={"pages": {"__all__": {"page_fragments": {"__all__": {"bbox"}}}}}
+    )
+    output = ParsedDocumentRef(document=document, usage=usage).model_dump()
     return output

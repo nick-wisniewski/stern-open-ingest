@@ -4,14 +4,6 @@ from typing import List, Tuple, Optional, Union
 from tensorlake_docai.pipeline.api import PageFragmentType, MergedTable
 
 
-class TextBoundingBox(BaseModel):
-    bbox: Tuple[float, float, float, float]
-    text: str
-    ref_id: Optional[str] = None  # Format: page.reading_order.cell_index (e.g., "1.16.20")
-    row_index: Optional[int] = None
-    column_index: Optional[int] = None
-
-
 class PageLayoutElement(BaseModel):
     bbox: Tuple[float, float, float, float]
     fragment_type: PageFragmentType
@@ -19,7 +11,6 @@ class PageLayoutElement(BaseModel):
     reading_order: int = -1
     ref_id: Optional[str] = None  # Format: page.reading_order (e.g., "1.16")
     ocr_text: Optional[str] = None
-    text_bounding_boxes: Optional[List[TextBoundingBox]] = None
     llm_summary: Optional[str] = None
     html: Optional[str] = None
     markdown: Optional[str] = None

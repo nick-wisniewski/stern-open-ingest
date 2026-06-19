@@ -34,7 +34,6 @@ from tensorlake_docai.pipeline.api import (
     ParsedDocument,
 )
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload
-from tensorlake_docai.postprocess.draw_bboxes import visualize_document_bboxes
 from tensorlake_docai.postprocess.formatter import page_to_markdown
 
 MIME_BY_EXT = {
@@ -96,11 +95,9 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
         table_merging=args.table_merging,
         table_summarization=args.table_summarization,
         table_summarization_prompt=args.table_summarization_prompt,
-        table_cell_grounding=args.table_cell_grounding,
         figure_summarization=args.figure_summarization,
         figure_summarization_prompt=args.figure_summarization_prompt,
         figure_ocr_prompt=args.figure_ocr_prompt,
-        figure_grounding=args.figure_grounding,
         chart_extraction=args.chart_extraction,
         key_value_extraction=args.key_value_extraction,
         page_classification_request=page_classification_request,
@@ -129,11 +126,6 @@ def main() -> None:
         "--local", action="store_true", help="Run in-process instead of remote deploy"
     )
     core.add_argument("--out", default="debug", help="Output directory")
-    core.add_argument(
-        "--draw-bboxes",
-        action="store_true",
-        help="Also write per-page PNGs with fragment bounding boxes overlayed",
-    )
 
     output = parser.add_argument_group("output shape")
     output.add_argument(
@@ -181,12 +173,6 @@ def main() -> None:
         default=None,
         help="Override prompt for table summarization",
     )
-    tables.add_argument(
-        "--table-cell-grounding",
-        action="store_true",
-        help="Produce per-cell bounding boxes for tables",
-    )
-
     figures = parser.add_argument_group("figure / chart enrichment")
     figures.add_argument(
         "--figure-summarization",
@@ -202,11 +188,6 @@ def main() -> None:
         "--figure-ocr-prompt",
         default=None,
         help="Override prompt for figure OCR (`dots-ocr` only)",
-    )
-    figures.add_argument(
-        "--figure-grounding",
-        action="store_true",
-        help="Produce per-text-region bounding boxes inside figures",
     )
     figures.add_argument(
         "--chart-extraction",
@@ -269,17 +250,6 @@ def main() -> None:
 
     for page in parsed.pages or []:
         (out_dir / f"page_{page.page_number}.md").write_text(page_to_markdown(page, req))
-
-    if args.draw_bboxes:
-        is_url = args.file.startswith("s3://") or args.file.startswith("http")
-        if is_url:
-            print("--draw-bboxes: skipping, remote URLs are not supported (pass a local file)")
-        else:
-            visualize_document_bboxes(
-                parsed,
-                file_path=args.file,
-                output_prefix=str(out_dir / "bbox_page"),
-            )
 
     if args.table_merging and parsed.merged_tables:
         print(f"Merged tables: {len(parsed.merged_tables)}")

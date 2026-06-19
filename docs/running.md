@@ -106,9 +106,6 @@ What `--local` does:
 
 Output: `./debug/document.json` plus one markdown file per chunk.
 
-Add `--draw-bboxes` to also write `debug/bbox_page_N.png` per page with fragment
-bounding boxes overlayed — handy for sanity-checking layout output.
-
 ---
 
 ## 4. Exercising more of the DAG
@@ -132,9 +129,7 @@ python examples/parse_pdf.py --file my.pdf --local \
 |---|---|---|
 | `--table-merging` | `table_merging` | Stitch tables across pages or split by intervening text |
 | `--table-summarization` | `table_summarization` | One-sentence VLM summary per table; pair with `--table-summarization-prompt` |
-| `--table-cell-grounding` | `table_cell_grounding` | Per-cell bboxes |
 | `--figure-summarization` | `figure_summarization` | Pair with `--figure-summarization-prompt` |
-| `--figure-grounding` | `figure_grounding` | Bboxes for text regions inside figures |
 | `--figure-ocr-prompt` | `figure_ocr_prompt` | DotsOCR figure OCR prompt override |
 | `--chart-extraction` | `chart_extraction` | Returns chart data as JSON |
 | `--key-value-extraction` | `key_value_extraction` | Key-value region markdown extraction |
@@ -194,7 +189,7 @@ Both examples produce a `ParsedDocument` (`pipeline/api.py`):
 
 | Field | Contents |
 |---|---|
-| `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...), bounding boxes, `ref_id`s |
+| `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...) and `ref_id`s |
 | `chunks[]` | Flattened content per `chunk_strategy` |
 | `page_classes[]` | Classification results |
 | `merged_tables[]` | Cross-page table stitching |

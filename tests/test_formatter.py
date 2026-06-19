@@ -17,9 +17,7 @@ from tensorlake_docai.pipeline.api import (
     Text,
 )
 from tensorlake_docai.postprocess.formatter import (
-    bbox_to_dict,
     document_to_markdown,
-    downsample_bbox_coordinates_for_parsed_output,
     escape_header_content,
     escape_markdown_content,
     page_fragment_to_markdown,
@@ -199,7 +197,6 @@ def test_chart_with_malformed_json_does_not_raise(request_md):
 def test_table_uses_markdown_when_mode_is_markdown(request_md):
     table = Table(
         content="table",
-        cells=[],
         html="<table><tr><td>x</td></tr></table>",
         markdown="| x |\n|---|",
     )
@@ -209,9 +206,7 @@ def test_table_uses_markdown_when_mode_is_markdown(request_md):
 
 
 def test_table_uses_html_when_mode_is_html(request_html):
-    table = Table(
-        content="table", cells=[], html="<table><tr><td>x</td></tr></table>", markdown="| x |"
-    )
+    table = Table(content="table", html="<table><tr><td>x</td></tr></table>", markdown="| x |")
     out = page_fragment_to_markdown(_frag(PageFragmentType.TABLE, table), request_html)
     assert "<table>" in out
     assert "| x |" not in out
@@ -220,7 +215,6 @@ def test_table_uses_html_when_mode_is_html(request_html):
 def test_table_summary_is_appended(request_md):
     table = Table(
         content="t",
-        cells=[],
         html="<table></table>",
         markdown="md",
         summary="key insight",
@@ -228,29 +222,6 @@ def test_table_summary_is_appended(request_md):
     out = page_fragment_to_markdown(_frag(PageFragmentType.TABLE, table), request_md)
     assert "Table Summary" in out
     assert "key insight" in out
-
-
-# --- bbox helpers ---------------------------------------------------------
-
-
-def test_bbox_to_dict():
-    assert bbox_to_dict((1.0, 2.0, 3.0, 4.0)) == {"x1": 1.0, "y1": 2.0, "x2": 3.0, "y2": 4.0}
-
-
-def test_downsample_bbox_coordinates_for_parsed_output():
-    bbox = {"x1": 100, "y1": 200, "x2": 300, "y2": 400}
-    out = downsample_bbox_coordinates_for_parsed_output(bbox, scale_factor=2)
-    assert out == {"x1": 50, "y1": 100, "x2": 150, "y2": 200}
-
-
-def test_downsample_none_bbox_returns_none():
-    assert downsample_bbox_coordinates_for_parsed_output(None, scale_factor=2) is None
-
-
-def test_downsample_uses_floor_division():
-    # Verify int floor — 3 / 2 = 1, not 1.5
-    out = downsample_bbox_coordinates_for_parsed_output({"x1": 3}, scale_factor=2)
-    assert out == {"x1": 1}
 
 
 # --- document/page-level integration --------------------------------------

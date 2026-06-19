@@ -450,10 +450,8 @@ def file_convertor_should_go_to_ocr(request) -> bool:
     if request.page_classification_request:
         needs_ocr_layout = bool(
             request.figure_summarization
-            or request.figure_grounding
             or request.chart_extraction
             or request.table_summarization
-            or request.table_cell_grounding
             or request.key_value_extraction
         )
         if not needs_ocr_layout:
@@ -466,10 +464,8 @@ def ocr_should_go_to_output_formatter(request) -> bool:
     """Go to OutputFormatter if no further processing needed"""
     return not (
         request.figure_summarization
-        or request.figure_grounding
         or request.chart_extraction
         or request.table_summarization
-        or request.table_cell_grounding
         or request.page_classification_request
     )
 
@@ -578,8 +574,6 @@ def dots_ocr_should_go_to_output_formatter(request, parse_result: ParseResult) -
     return not (
         (request.figure_summarization and has_figure)
         or (request.table_summarization and has_table)
-        or (request.table_cell_grounding and has_table)
-        or (request.figure_grounding and has_figure)
         or (request.chart_extraction and (has_chart or has_figure or has_table))
         or (request.key_value_extraction and (has_form or has_figure or has_table))
         or request.page_classification_request
@@ -594,10 +588,8 @@ def ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> bool:
     return (
         (request.figure_summarization and has_figure)
         or (request.table_summarization and has_table)
-        or (request.table_cell_grounding and has_table)
         or (request.chart_extraction and (has_figure or has_table))
         or (request.key_value_extraction and (has_figure or has_table or has_form))
-        or (request.figure_grounding and has_figure)
         or request.page_classification_request
     )
 
@@ -613,11 +605,9 @@ def dots_ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> 
     )
     return (
         (request.table_summarization and has_table)
-        or (request.table_cell_grounding and has_table)
         or (request.figure_summarization and has_figure)
         or (request.chart_extraction and (has_chart or has_figure or has_table))
         or (request.key_value_extraction and (has_form or has_figure or has_table))
-        or (request.figure_grounding and has_figure)
         or request.page_classification_request
     )
 

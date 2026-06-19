@@ -22,4 +22,6 @@ Hard constraints (do not violate without explicit instruction):
   backend and a born-digital-first CPU path; check `src/tensorlake_docai/ocr/`
   for what's actually registered. See `CLAUDE.md` for current direction.
 - After editing Python, run `black`, `ruff check`, and `pytest tests/ -q` before
-  reporting done.
+  reporting done. In Cursor sessions, these tools live in the repo-local
+  `.venv-cursor`; use `.venv-cursor/bin/black`, `.venv-cursor/bin/ruff`, and
+  `.venv-cursor/bin/pytest` if they are not on `PATH`.

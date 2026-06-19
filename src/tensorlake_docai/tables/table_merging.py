@@ -810,7 +810,6 @@ async def _process_single_page_tables(
                 # Create merged fragment
                 new_content = Table(
                     content=table_content,
-                    cells=[],
                     html=merged_html,
                     summary=merged_summary,
                 )
@@ -1587,7 +1586,6 @@ async def _orchestrate_table_merging_async(
 
                 frag.content = Table(
                     content=table_content,
-                    cells=[],
                     html=html_content,
                     summary="",
                     markdown=frag.content.content,
