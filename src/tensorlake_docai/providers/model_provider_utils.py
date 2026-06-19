@@ -119,9 +119,7 @@ async def _make_gemini_call(
         "top_k": 40,
         "max_output_tokens": 64000,  # 8192, double the max tokens so it can handle some super dense tables
         "response_mime_type": (
-            "application/json"
-            if job_type in ["json_schema", "page_classification", "ocr"]
-            else "text/plain"
+            "application/json" if job_type in ["json_schema", "ocr"] else "text/plain"
         ),
         # "thinking_config": types.ThinkingConfig(thinking_budget=0)
     }
@@ -136,24 +134,15 @@ async def _make_gemini_call(
 
     # Conditionally add the appropriate schema field based on job type
     if schema:
-        if job_type in ["json_schema", "page_classification"]:
+        if job_type == "json_schema":
             generation_config["response_json_schema"] = schema
         else:
             generation_config["response_schema"] = schema
 
     if "thinking_config" not in generation_config:
-        # turn off thinking for other tasks except page classification
-        if job_type != "page_classification":
-            generation_config["thinking_config"] = types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.LOW
-            )
-        # limit thinking budget to 2048 tokens for page classification
-        # https://ai.google.dev/gemini-api/docs/thinking
-        # I personally think page classification is a medium level task
-        else:
-            generation_config["thinking_config"] = types.ThinkingConfig(
-                thinking_level=types.ThinkingLevel.MEDIUM
-            )
+        generation_config["thinking_config"] = types.ThinkingConfig(
+            thinking_level=types.ThinkingLevel.LOW
+        )
 
     # Handle PDF vs image inputs
     if pdf_bytes:
@@ -296,7 +285,7 @@ async def _make_gemini_call(
             )
 
         # Parse JSON response if needed
-        if job_type in ["json_schema", "page_classification", "ocr"]:
+        if job_type in ["json_schema", "ocr"]:
             try:
                 _ = json.loads(accumulated_text)
             except json.JSONDecodeError as e:
@@ -450,16 +439,6 @@ async def _make_oai_call(
                 "stream": True,
                 "stream_options": {"include_usage": True},
             }
-
-            if job_type == "page_classification" and schema:
-                req_params["response_format"] = {
-                    "type": "json_schema",
-                    "json_schema": {
-                        "name": "page_classification",
-                        "schema": schema,
-                        "strict": True,
-                    },
-                }
 
             # Stream the response with timeout management
             accumulated_text = ""
@@ -646,7 +625,7 @@ async def run_clients(
 
     # Use only the first model (should be gemini_call)
     # Later we will enable model selection
-    # switch model usage from gemini to openAI for summarization and page classification tasks
+    # Switch model usage from Gemini to OpenAI for retained VLM tasks.
     def _is_server_issue(error_msg: str) -> bool:
         """Check if error indicates a server issue requiring longer backoff."""
         error_lower = error_msg.lower()

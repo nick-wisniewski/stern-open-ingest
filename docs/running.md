@@ -59,8 +59,8 @@ set -a; source .env; set +a
 | Feature | Required env vars |
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
-| VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
-| Table merging / page classification | `GEMINI_API_KEY` (default provider) or another LLM key |
+| Key-value extraction | `GEMINI_API_KEY` (default provider) or another LLM key |
+| Table merging | `GEMINI_API_KEY` (default provider) or another LLM key |
 
 Missing keys silently disable the dependent feature — the rest of the pipeline
 keeps running.
@@ -114,39 +114,21 @@ Every enrichment / detection stage is gated by a field on `ParseRequest`
 and `examples/parse_pdf.py` exposes them as CLI flags. Run
 `python examples/parse_pdf.py --help` for the full list.
 
-### OCR + VLM enrichment
+### OCR + retained enrichment
 
 ```bash
 python examples/parse_pdf.py --file my.pdf --local \
     --ocr-model dots-ocr \
-    --table-summarization \
-    --figure-summarization \
-    --chart-extraction
+    --table-merging \
+    --key-value-extraction \
+    --xpage-header-detection
 ```
 
 | Flag | Maps to `ParseRequest` field | Notes |
 |---|---|---|
 | `--table-merging` | `table_merging` | Stitch tables across pages or split by intervening text |
-| `--table-summarization` | `table_summarization` | One-sentence VLM summary per table; pair with `--table-summarization-prompt` |
-| `--figure-summarization` | `figure_summarization` | Pair with `--figure-summarization-prompt` |
-| `--figure-ocr-prompt` | `figure_ocr_prompt` | DotsOCR figure OCR prompt override |
-| `--chart-extraction` | `chart_extraction` | Returns chart data as JSON |
 | `--key-value-extraction` | `key_value_extraction` | Key-value region markdown extraction |
-| `--detect-barcode` | `detect_barcode` | |
 | `--xpage-header-detection` | `xpage_header_detection` | Remove repeating headers/footers |
-
-### Page classification
-
-`--classify NAME:DESCRIPTION` is repeatable; `--classification-type` defaults to
-`multi_label`.
-
-```bash
-python examples/parse_pdf.py --file my.pdf --local \
-    --ocr-model dots-ocr \
-    --classify invoice:"Has invoice header + line items" \
-    --classify contract:"Legal terms, signature block" \
-    --classification-type multi_class
-```
 
 ### Page selection, chunking, table format
 
@@ -165,7 +147,6 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--chunk-strategy` | `chunk_strategy` — `none` \| `page` \| `section` \| `fragment` |
 | `--table-output-mode` | `table_output_mode` — `markdown` \| `html` \| `json` |
 | `--ignore-sections` | `ignore_sections` — e.g. `--ignore-sections page_footer figure` |
-| `--include-images` | `include_images` |
 
 ### File inputs
 
@@ -190,7 +171,6 @@ Both examples produce a `ParsedDocument` (`pipeline/api.py`):
 |---|---|
 | `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...) and `ref_id`s |
 | `chunks[]` | Flattened content per `chunk_strategy` |
-| `page_classes[]` | Classification results |
 | `merged_tables[]` | Cross-page table stitching |
 | `usage` | Token counts per stage (OCR / VLM / header correction) |
 

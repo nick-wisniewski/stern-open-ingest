@@ -4,8 +4,6 @@ Local-GPU Figure OCR task using the Ovis VLM for classification and extraction.
 
 - Two-stage pipeline: classification -> type-specific extraction
 - Figure types: BARCODE, CHART, DIAGRAM, FORM, TABLE, OTHER
-- Barcode detection and decoding (pyzbar, zxing)
-- Base64 image encoding option
 - Async batch processing for efficiency
 - Runs as a dedicated GPU function alongside DotsOCRTask
 """
@@ -29,7 +27,6 @@ from tensorlake_docai.prompts.dotsocr_prompts import (
 )
 from tensorlake_docai.pipeline.api import PageFragmentType
 from tensorlake_docai.pipeline.routing import (
-    pil_image_to_base64,
     should_route_to_table_merging,
     dots_ocr_should_go_to_output_formatter,
     dots_ocr_should_go_to_vlm_extraction,
@@ -181,22 +178,6 @@ class OvisFigureOCRTask(BatchProcessor):
                 f"⚠️ Warning: Figure OCR failed for batch {batch_number}, continuing with page OCR results: {e}"
             )
             traceback.print_exc()
-
-            req = self._parse_result.request
-            include_image_in_output = (
-                req.include_images if hasattr(req, "include_images") else False
-            )
-            if include_image_in_output:
-                try:
-                    for element, cropped_img in zip(figure_elements, figures_to_process):
-                        element.image_base64 = pil_image_to_base64(cropped_img)
-                    print(
-                        f"Encoded {len(figure_elements)} figure images as base64 (figure OCR failed but page OCR output preserved)"
-                    )
-                except Exception as img_err:
-                    print(
-                        f"⚠️ Warning: Failed to encode figure images after OCR failure: {img_err}"
-                    )
 
         return []
 
@@ -362,7 +343,7 @@ class OvisFigureOCRTask(BatchProcessor):
             figures_to_process: List of cropped figure images
             figure_elements: List of corresponding PageElement objects
             figure_metadata: List of metadata dicts (page, figure, bbox, sx, sy)
-            images_by_page: Dict mapping page numbers to PIL images (for barcode re-cropping)
+            images_by_page: Dict mapping page numbers to PIL images
             batch_number: Current batch number for logging
         """
         import time
@@ -408,7 +389,7 @@ class OvisFigureOCRTask(BatchProcessor):
         print(f"🚀 Processing all {len(figures_to_process)} figures in batches by type...")
         figure_results = []
 
-        # Separate barcodes (no inference needed) from figures needing extraction
+        # Separate barcode labels (no extraction prompt needed) from figures needing extraction.
         groups = defaultdict(list)  # (prompt_text, figure_type) -> [(idx, image)]
         for idx in range(len(figures_to_process)):
             figure_type = figure_types[idx]
@@ -447,11 +428,6 @@ class OvisFigureOCRTask(BatchProcessor):
         print(f"⏱️ Ovis figure OCR batch {batch_number} completed in {dt:.2f}s")
         print(f"Token usage - Input: {total_input_tokens}, Output: {total_output_tokens}")
 
-        # Get request parameters once before loop (not for each figure)
-        req = self._parse_result.request
-        include_image_in_output = req.include_images if hasattr(req, "include_images") else False
-        detect_barcode = req.detect_barcode if hasattr(req, "detect_barcode") else False
-
         # Merge results back into elements
         import re
 
@@ -459,7 +435,6 @@ class OvisFigureOCRTask(BatchProcessor):
             zip(figure_elements, results, figures_to_process, figure_metadata)
         ):
             # Parse FIGURE_TYPE from structured output if present
-            is_barcode = False
             is_table = False
             is_form = False
             figure_type = None
@@ -468,7 +443,6 @@ class OvisFigureOCRTask(BatchProcessor):
                 for line in text.split("\n"):
                     if line.startswith("FIGURE_TYPE:"):
                         figure_type = line.replace("FIGURE_TYPE:", "").strip()
-                        is_barcode = figure_type == "BARCODE"
                         is_table = figure_type == "TABLE"
                         is_form = figure_type == "FORM"
                         break
@@ -505,64 +479,6 @@ class OvisFigureOCRTask(BatchProcessor):
                     f"{element.markdown}\n\n{clean_text}" if element.markdown else clean_text
                 )
 
-            if detect_barcode and is_barcode:
-                print(f"🔍 Figure {idx}: Ovis text = '{text[:100]}...'", flush=True)
-                # Change fragment type to BARCODE
-                element.fragment_type = PageFragmentType.BARCODE
-
-                try:
-                    from pyzbar.pyzbar import decode
-
-                    # Re-crop with padding for better barcode detection
-                    padded_img = self._crop_with_padding(
-                        images_by_page[meta["page"]],
-                        meta["bbox"],
-                        meta["sx"],
-                        meta["sy"],
-                        padding=10,
-                    )
-
-                    # Read barcode(s) from the image
-                    results_pyzbar = decode(padded_img)
-                    print(f"Decoded barcode: {results_pyzbar}")
-
-                    if results_pyzbar:
-                        decoded_text = f"{results_pyzbar[0].type}: {results_pyzbar[0].data.decode('utf-8', errors='replace')}"
-                        print(f"✅ Decoded barcode: {decoded_text}")
-
-                        # Update element with decoded barcode
-                        element.ocr_text = decoded_text
-                        element.markdown = decoded_text
-                    else:
-                        print("⚠️ Warning: Pyzbar barcode decoding failed, trying zxing")
-                        # Try zxing on the same barcode image
-                        try:
-                            import zxing
-
-                            reader = zxing.BarCodeReader()
-                            result = reader.decode(padded_img)
-                            print(f"Decoded barcode with zxing: {result}")
-                            if result:
-                                decoded_text = f"{result.format}: {result.parsed}"
-                                print(f"✅ Decoded barcode with zxing: {decoded_text}")
-                                element.ocr_text = decoded_text
-                                element.markdown = decoded_text
-                            else:
-                                print("⚠️ Warning: ZXing barcode decoding failed")
-                        except Exception as zxing_err:
-                            print(f"⚠️ Warning: ZXing import/decode failed: {zxing_err}")
-
-                except Exception as barcode_err:
-                    print(f"⚠️ Warning: Barcode decoding failed: {barcode_err}")
-
-            # Encode image as base64 if requested
-            if include_image_in_output:
-                try:
-                    element.image_base64 = pil_image_to_base64(cropped_img)
-                    print(f"Encoded figure image as base64 ({len(element.image_base64)} bytes)")
-                except Exception as img_err:
-                    print(f"⚠️ Warning: Failed to encode figure image: {img_err}")
-
         # Clean up large collections to free memory
         del figures_to_process, figure_elements, figure_metadata, images_by_page
         print(f"✅ Figure batch {batch_number} processing completed")
@@ -588,8 +504,7 @@ class OvisFigureOCRTask(BatchProcessor):
         2. For each batch, find figures on those pages
         3. Classify figures by type
         4. Extract content with type-specific prompts
-        5. Decode barcodes if requested
-        6. Encode images as base64 if requested
+        5. Route to the next post-OCR stage
 
         Args:
             parse_result: ParseResult with document layouts containing figures

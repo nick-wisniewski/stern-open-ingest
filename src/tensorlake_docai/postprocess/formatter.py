@@ -1,9 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
-import json
 from typing import Dict, List, Union, Tuple, Optional
 
 from tensorlake_docai.pipeline.api import (
-    Chart,
     Page,
     PageFragment,
     PageFragmentType,
@@ -115,44 +113,9 @@ def page_fragment_to_markdown(page_fragment: PageFragment, request: ParseRequest
         escaped_content = escape_markdown_content(content.content)
         return f"{escaped_content}\n\n"
 
-    if page_fragment.fragment_type == PageFragmentType.FIGURE:
+    if page_fragment.fragment_type in [PageFragmentType.FIGURE, PageFragmentType.CHART]:
         escaped_figure_content = escape_markdown_content(content.content)
-
-        # prepare for figure image
-        figure_image = f"![Figure]({content.image_base64})\n\n" if content.image_base64 else ""
-
-        # handle figure summary
-        figure_summary = ""
-        if content.summary:
-            # If summary exactly matches content, output only one copy
-            if content.summary == content.content:
-                return f"### Figure \n{figure_image}{escaped_figure_content}\n\n"
-            escaped_summary = escape_markdown_content(content.summary)
-            figure_summary = f"Figure Summary \n{escaped_summary}\n\n"
-
-        return f"### Figure \n{figure_image}{escaped_figure_content}\n{figure_summary}\n"
-
-    if page_fragment.fragment_type == PageFragmentType.CHART:
-        # escaped_chart_content = escape_markdown_content(content.content)
-
-        # prepare for chart image
-        chart_image = f"![Chart]({content.image_base64})\n\n" if content.image_base64 else ""
-
-        # handle chart summary
-        escaped_chart_content = ""
-        try:
-            data_content = json.loads(content.content)
-            if isinstance(data_content, list) and data_content:
-                if len(data_content) == 1:
-                    data_content = data_content[0]
-
-            indented_json = json.dumps(data_content, indent=2)
-            escaped_chart_content = escape_markdown_content(indented_json)
-        except Exception:
-            # If any part of data processing fails, leave chart content empty.
-            print("Failed to process chart data for markdown output.")
-
-        return f"### Chart \n{chart_image}\n\n```json\n{escaped_chart_content}\n```\n\n"
+        return f"### Figure \n{escaped_figure_content}\n\n"
 
     if page_fragment.fragment_type == PageFragmentType.TABLE:
         table_summary = ""
@@ -225,7 +188,7 @@ def document_layout_to_document(
                 print(f"Skipping ignored element of class {page_element.fragment_type}")
                 continue
 
-            parsed_content: Union[Text, Table, Figure, Chart, SectionHeader]
+            parsed_content: Union[Text, Table, Figure, SectionHeader]
             if page_element.fragment_type in [
                 PageFragmentType.SECTION_HEADER,
                 PageFragmentType.TITLE,
@@ -281,20 +244,9 @@ def document_layout_to_document(
                 parsed_content = ListItem(
                     content=content,
                 )
-            elif page_element.fragment_type == PageFragmentType.FIGURE:
+            elif page_element.fragment_type in [PageFragmentType.FIGURE, PageFragmentType.CHART]:
                 parsed_content = Figure(
                     content=content,
-                    summary=page_element.llm_summary,
-                    image_base64=(
-                        page_element.image_base64 if hasattr(page_element, "image_base64") else None
-                    ),
-                )
-            elif page_element.fragment_type == PageFragmentType.CHART:
-                parsed_content = Chart(
-                    content=page_element.llm_summary,
-                    image_base64=(
-                        page_element.image_base64 if hasattr(page_element, "image_base64") else None
-                    ),
                 )
             elif page_element.fragment_type == PageFragmentType.SIGNATURE:
                 parsed_content = Signature(
@@ -322,9 +274,6 @@ def document_layout_to_document(
                 page_fragments=parsed_page_fragments,
                 dimensions=page_layout.shape,
                 page_dimensions=page_layout.page_dimensions,
-                page_class=page_layout.page_class,
-                classification_reason=page_layout.classification_reason,
-                classification_confidence=getattr(page_layout, "classification_confidence", None),
             )
         )
     parsed_pages.sort(key=lambda x: x.page_number)

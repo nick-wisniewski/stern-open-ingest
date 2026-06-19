@@ -78,18 +78,11 @@ class Table(BaseModel):
 
 class Figure(BaseModel):
     content: str
-    summary: Optional[str] = None
-    image_base64: Optional[str] = None  # Base64-encoded image data for rendering
-
-
-class Chart(BaseModel):
-    content: str
-    image_base64: Optional[str] = None  # Base64-encoded image data for rendering
 
 
 class PageFragment(BaseModel):
     fragment_type: PageFragmentType
-    content: Union[Text, Table, Figure, Chart, ListItem, Signature, SectionHeader]
+    content: Union[Text, Table, Figure, ListItem, Signature, SectionHeader]
     reading_order: Optional[int] = None
     bbox: Optional[dict[str, float]] = None
     ref_id: Optional[str] = None  # Format: page.reading_order or page.reading_order.cell_index
@@ -104,9 +97,6 @@ class Page(BaseModel):
     page_fragments: Optional[List[PageFragment]] = []
     dimensions: Optional[Tuple[int, int]] = None
     page_dimensions: Optional[Dict[str, int]] = None
-    page_class: Optional[Union[str, List[str]]] = None
-    classification_reason: Optional[str] = None
-    classification_confidence: Optional[float] = None
 
 
 class Chunk(BaseModel):
@@ -116,13 +106,6 @@ class Chunk(BaseModel):
     element_ids: Optional[List[str]] = (
         None  # ref_ids of elements in this chunk (e.g., ["2.5", "2.6", "3.1"])
     )
-
-
-class PageClass(BaseModel):
-    page_numbers: List[int]
-    classification_reasons: Optional[Dict[int, str]] = None
-    classification_confidences: Optional[Dict[int, float]] = None
-    page_class: str
 
 
 class MergeTableActions(BaseModel):
@@ -147,7 +130,6 @@ class ParsedDocument(BaseModel):
     chunks: List[Chunk]
     merged_tables: Optional[List[MergedTable]] = None
     total_pages: Optional[int] = None
-    page_classes: Optional[List[PageClass]] = None
     document_markdown: Optional[str] = None  # Full document markdown representation
 
 
@@ -191,32 +173,6 @@ class OrganizationQuotaRequest(BaseModel):
     quotas: List[ResourceQuotaRequest]
 
 
-##### REQUEST API INTO THE WORKFLOW #####
-class PageClassDefinition(BaseModel):
-    class_name: str
-    description: str
-
-
-class ClassificationRequest(BaseModel):
-    """
-    Request for page classification.
-
-    classification_type:
-        - "multi-label": Each page can belong to multiple classes simultaneously (default).
-        - "multi-class": Each page can belong to only one class.
-    """
-
-    class_definitions: List[PageClassDefinition]
-    classification_type: Literal["multi_label", "multi_class"] = Field(
-        default="multi_label",
-        description=(
-            "Type of classification to perform. "
-            "'multi-label' allows each page to have multiple classes. "
-            "'multi-class' restricts each page to a single class."
-        ),
-    )
-
-
 class ParseRequest(BaseModel):
     file_bytes: Optional[str] = None
     file_url: Optional[str] = None
@@ -225,25 +181,14 @@ class ParseRequest(BaseModel):
     file_name: str
     mime_type: str
     skew_correction: bool = False
-    detect_barcode: bool = False
     debug: bool = False
     chunk_strategy: Optional[str] = None
     table_parsing_strategy: Optional[Literal["tsr", "vlm"]] = "vlm"
     table_output_mode: Optional[Literal["html", "json", "markdown"]] = "markdown"
     ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
-    page_classification_request: Optional[ClassificationRequest] = None
     disable_layout_detection: Optional[bool] = False
-    table_summarization: Optional[bool] = False
-    table_summarization_prompt: Optional[str] = None
     table_merging: bool = False
-    figure_summarization: Optional[bool] = False
-    figure_summarization_prompt: Optional[str] = None
-    figure_ocr_prompt: Optional[str] = None  # For automatic figure OCR in the `dots-ocr` path
-    # This is to make the full page image in table and figure summarization optional
-    chart_extraction: Optional[bool] = False
     key_value_extraction: Optional[bool] = False
-    include_full_page_image: Optional[bool] = False
     ignore_sections: Optional[Set[PageFragmentType]] = None
     org_quota: Optional[OrganizationQuotaRequest] = None
     xpage_header_detection: bool = False
-    include_images: Optional[bool] = False

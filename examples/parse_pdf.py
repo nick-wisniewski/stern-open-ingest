@@ -7,15 +7,9 @@ Usage:
     # Run the pipeline in-process
     python examples/parse_pdf.py --file my.pdf --local
 
-    # With VLM enrichment
+    # With retained enrichment
     python examples/parse_pdf.py --file my.pdf --local \
-        --table-merging --table-summarization --figure-summarization \
-        --chart-extraction
-
-    # With page classification
-    python examples/parse_pdf.py --file my.pdf --local \
-        --classify invoice:"Has invoice header + line items" \
-        --classify contract:"Legal terms, signature block"
+        --table-merging --key-value-extraction --xpage-header-detection
 
 Output: ./debug/document.json plus one ./debug/page_N.md per page.
 """
@@ -28,8 +22,6 @@ from pathlib import Path
 from tensorlake.applications import run_local_application, run_remote_application
 
 from tensorlake_docai.pipeline.api import (
-    ClassificationRequest,
-    PageClassDefinition,
     ParseRequest,
     ParsedDocument,
 )
@@ -44,18 +36,6 @@ MIME_BY_EXT = {
     ".heif": "image/heif",
     ".heic": "image/heic",
 }
-
-
-def _parse_class_pair(raw: str) -> PageClassDefinition:
-    if ":" not in raw:
-        raise argparse.ArgumentTypeError(f"--classify expects 'name:description', got: {raw!r}")
-    name, _, desc = raw.partition(":")
-    name, desc = name.strip(), desc.strip()
-    if not name or not desc:
-        raise argparse.ArgumentTypeError(
-            f"--classify expects non-empty name and description, got: {raw!r}"
-        )
-    return PageClassDefinition(class_name=name, description=desc)
 
 
 def build_request(args: argparse.Namespace) -> ParseRequest:
@@ -75,13 +55,6 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
         file_name = local.name
         mime_type = MIME_BY_EXT.get(local.suffix.lower(), "application/pdf")
 
-    page_classification_request = None
-    if args.classify:
-        page_classification_request = ClassificationRequest(
-            class_definitions=args.classify,
-            classification_type=args.classification_type,
-        )
-
     return ParseRequest(
         file_bytes=file_bytes,
         file_url=file_url,
@@ -91,18 +64,9 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
         pages_to_parse=args.pages or None,
         chunk_strategy=args.chunk_strategy,
         table_output_mode=args.table_output_mode,
-        detect_barcode=args.detect_barcode,
         table_merging=args.table_merging,
-        table_summarization=args.table_summarization,
-        table_summarization_prompt=args.table_summarization_prompt,
-        figure_summarization=args.figure_summarization,
-        figure_summarization_prompt=args.figure_summarization_prompt,
-        figure_ocr_prompt=args.figure_ocr_prompt,
-        chart_extraction=args.chart_extraction,
         key_value_extraction=args.key_value_extraction,
-        page_classification_request=page_classification_request,
         xpage_header_detection=args.xpage_header_detection,
-        include_images=args.include_images,
         ignore_sections=set(args.ignore_sections) if args.ignore_sections else None,
     )
 
@@ -146,77 +110,17 @@ def main() -> None:
         default=[],
         help="PageFragmentType values to drop from output (e.g. page_footer figure)",
     )
-    output.add_argument(
-        "--include-images",
-        action="store_true",
-        help="Include base64 page/figure images in the output",
-    )
-
-    detection = parser.add_argument_group("detection")
-    detection.add_argument(
-        "--detect-barcode", action="store_true", help="Detect barcodes in the document"
-    )
-
     tables = parser.add_argument_group("table enrichment")
     tables.add_argument(
         "--table-merging",
         action="store_true",
         help="Stitch tables that span pages or are split by intervening content",
     )
-    tables.add_argument(
-        "--table-summarization",
-        action="store_true",
-        help="Describe each table with a VLM",
-    )
-    tables.add_argument(
-        "--table-summarization-prompt",
-        default=None,
-        help="Override prompt for table summarization",
-    )
-    figures = parser.add_argument_group("figure / chart enrichment")
-    figures.add_argument(
-        "--figure-summarization",
-        action="store_true",
-        help="Describe each figure with a VLM",
-    )
-    figures.add_argument(
-        "--figure-summarization-prompt",
-        default=None,
-        help="Override prompt for figure summarization",
-    )
-    figures.add_argument(
-        "--figure-ocr-prompt",
-        default=None,
-        help="Override prompt for figure OCR (`dots-ocr` only)",
-    )
-    figures.add_argument(
-        "--chart-extraction",
-        action="store_true",
-        help="Extract data series (JSON) from charts",
-    )
-
     forms = parser.add_argument_group("forms / key-value")
     forms.add_argument(
         "--key-value-extraction",
         action="store_true",
         help="Extract key-value pairs from detected document regions",
-    )
-
-    classify = parser.add_argument_group("page classification")
-    classify.add_argument(
-        "--classify",
-        type=_parse_class_pair,
-        action="append",
-        default=[],
-        metavar="NAME:DESCRIPTION",
-        help="Add a page class. Repeat for multiple classes. "
-        "Example: --classify invoice:'Has invoice header'",
-    )
-    classify.add_argument(
-        "--classification-type",
-        default="multi_label",
-        choices=["multi_label", "multi_class"],
-        help="Page classification mode (default: multi_label)",
     )
 
     xpage = parser.add_argument_group("cross-page heuristics")
@@ -255,11 +159,6 @@ def main() -> None:
         print(f"Merged tables: {len(parsed.merged_tables)}")
         for mt in parsed.merged_tables:
             print(f"  - {mt.merged_table_id}: pages {mt.start_page}-{mt.end_page}")
-
-    if parsed.page_classes:
-        print(f"Page classifications: {len(parsed.page_classes)}")
-        for pc in parsed.page_classes:
-            print(f"  - {pc.page_class}: pages {pc.page_numbers}")
 
     print(f"Wrote results to {out_dir}/")
 

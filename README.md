@@ -33,11 +33,10 @@ Given a PDF or image (PNG, JPEG, HEIF, HEIC), the workflow:
    extension as a fallback).
 2. **Runs OCR / layout** with `dots-ocr` (the only backend in this fork; see
    [`docs/models.md`](docs/models.md)).
-3. **Enriches** (optional): table/figure summarization, cross-page table merging,
-   chart extraction, key-value extraction, page classification.
-4. **Extracts structured data** against a JSON schema with citation tracking.
-5. **Returns** a single `ParsedDocument` (pages, fragments, tables, structured
-   outputs, usage).
+3. **Enriches** (optional): cross-page table merging, key-value extraction, and
+   cross-page header cleanup.
+4. **Returns** a single `ParsedDocument` (pages, fragments, tables, markdown,
+   usage).
 
 ### Accepted inputs
 
@@ -92,7 +91,7 @@ Only the features you use need keys:
 | Feature | Keys |
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
-| VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
+| Key-value extraction / table merging | `GEMINI_API_KEY` or another configured LLM key |
 
 Missing keys silently disable the dependent feature; the rest of the pipeline
 keeps running.
@@ -105,8 +104,8 @@ python examples/parse_pdf.py --file my.pdf --ocr-model dots-ocr --local
 
 Results land in `./debug/` (`document.json` plus one markdown file per chunk).
 
-Full walkthrough — every `ParseRequest` flag, VLM enrichment, page
-classification, and file input mode — is in [`docs/running.md`](docs/running.md).
+Full walkthrough — every retained `ParseRequest` flag and file input mode — is
+in [`docs/running.md`](docs/running.md).
 
 ---
 
@@ -135,13 +134,13 @@ register it with the runner.
 - **Bring your own OCR backend.** Drop a file in `src/tensorlake_docai/ocr/`,
   register it in `ocr/__init__.py`, widen the `ocr_model` enum in
   `pipeline/api.py`, and import it in `workflow.py`. Calling `route_after_ocr`
-  at the end of your task wires it into table merging, VLM enrichment, and the
+  at the end of your task wires it into table merging, key-value extraction, and the
   unified output format. Step-by-step:
   [`src/tensorlake_docai/ocr/README.md`](src/tensorlake_docai/ocr/README.md).
   This is the path we'll use to add a lighter OCR backend (see `CLAUDE.md`).
-- **Add a VLM enrichment pass.** Table/figure summarization, chart extraction,
-  and key-value extraction live in `src/tensorlake_docai/vlm/cloud.py` as batched
-  passes over the document — add another by following the same shape.
+- **Add a VLM enrichment pass.** Key-value extraction lives in
+  `src/tensorlake_docai/vlm/cloud.py` as a batched pass over the document; use
+  that shape for any future retained enrichment.
 
 The `dots-ocr` backend doubles as the reference implementation for serving a GPU
 model: vLLM engine setup, model caching, two-stage classification → extraction,
@@ -160,9 +159,9 @@ stern-open-ingest/
 │   └── tensorlake_docai/
 │       ├── pipeline/            # file_converter, routing, output_formatter, api
 │       ├── ocr/                 # dots_ocr, figure_ocr (BYO-OCR registry)
-│       ├── vlm/                 # VLM summarization, grounding, chart extraction
+│       ├── vlm/                 # retained VLM key-value extraction task
 │       ├── extraction/          # output chunking and key-value extraction helpers
-│       ├── tables/              # cross-page merging, cell grounding, correction
+│       ├── tables/              # cross-page merging and correction
 │       ├── postprocess/         # header correction, formatter, output cleaner
 │       ├── models/              # ParseResult, PageLayout, etc.
 │       ├── providers/           # LLM client wrappers

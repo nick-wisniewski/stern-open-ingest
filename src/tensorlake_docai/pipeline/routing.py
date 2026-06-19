@@ -5,7 +5,6 @@ Module with utility functions to use by workflow steps.
 
 import asyncio
 import base64
-import json
 import re
 import time
 from typing import List, Optional, Tuple
@@ -312,97 +311,6 @@ def _download_file(file_url: str) -> Tuple[bytes, str]:
     raise RequestException(message="file_url must be an HTTPS presigned URL")
 
 
-# Convert class definitions to a JSON schema string for page classification tasks
-def create_classification_choice_and_prompt(
-    class_definitions, classification_type
-) -> Tuple[str, List[str], str]:
-    class_choices = [cls.class_name for cls in class_definitions]
-    # Check if the input page class is empty, if so, raise an exception
-    if len(class_choices) == 0 or sum(len(cls.strip()) for cls in class_choices) == 0:
-        raise RequestException(message="No page classes provided")
-    print(f"class_choices: {class_choices}")
-    descriptions = {cls.class_name: cls.description for cls in class_definitions}
-
-    class_choices.append("unclassified")
-    descriptions["unclassified"] = "Page does not belong to any of the above categories."
-
-    confidence_guidance = (
-        "Also provide a confidence score between 0.0 and 1.0 reflecting how certain you are: "
-        "0.95-1.0 = very clear match with strong signals; "
-        "0.7-0.94 = likely match but some ambiguity; "
-        "0.4-0.69 = uncertain, weak signals; "
-        "below 0.4 = guessing. "
-        "Base the score on your reasoning — do not assign it independently."
-    )
-
-    if classification_type == "multi_label":
-        prompt_lines = [
-            "You are document page classifier. You are given a page and a list of categories. ",
-            "You need to classify the page into the most relevant categories from the list below. A page may belong to multiple categories.",
-            "If the page does not belong to any of the categories, select 'unclassified'.",
-            "Do no hellucinate categories that are not present in the provided list.",
-            "Then, explain briefly why you chose these categories based on the content of the page.",
-            confidence_guidance,
-            "Categories:",
-        ]
-        for cls_name, cls_desc in descriptions.items():
-            prompt_lines.append(f"- {cls_name}: {cls_desc}")
-        classification_prompt = "\n".join(prompt_lines)
-        schema = {
-            "type": "object",
-            "properties": {
-                "page_classes": {
-                    "type": "array",
-                    "items": {"type": "string", "enum": class_choices},
-                    "description": "List of all categories that apply to this page.",
-                },
-                "reason": {
-                    "type": "string",
-                    "description": "Explanation for why these categories were chosen.",
-                },
-                "confidence": {
-                    "type": "number",
-                    "description": "Confidence score between 0.0 and 1.0 indicating certainty of classification.",
-                },
-            },
-            "required": ["page_classes", "reason", "confidence"],
-        }
-    else:  # multi_class
-        # Add a default page class in case there are pages that dont match nay of the page classes
-
-        prompt_lines = [
-            "Classify this page into one of the following categories. IMPORTANT: Only select a specific category if the page clearly and definitively belongs to it. If there is any doubt, ambiguity, or if the page doesn't match the descriptions well, select 'unclassified'. It's better to be conservative and use 'unclassified' than to force an incorrect classification.",
-            "Then, briefly explain why you chose this category based on the content of the page.",
-            confidence_guidance,
-            "Categories:",
-        ]
-        # Put unclassified first to emphasize it as the default choice
-        if "unclassified" in descriptions:
-            prompt_lines.append(f"- unclassified: {descriptions['unclassified']}")
-        for cls_name, cls_desc in descriptions.items():
-            if cls_name != "unclassified":
-                prompt_lines.append(f"- {cls_name}: {cls_desc}")
-
-        classification_prompt = "\n".join(prompt_lines)
-        schema = {
-            "type": "object",
-            "properties": {
-                "page_class": {"type": "string", "enum": class_choices},
-                "reason": {
-                    "type": "string",
-                    "description": "Brief explanation for why this category was chosen.",
-                },
-                "confidence": {
-                    "type": "number",
-                    "description": "Confidence score between 0.0 and 1.0 indicating certainty of classification.",
-                },
-            },
-            "required": ["page_class", "reason", "confidence"],
-        }
-
-    return json.dumps(schema), class_choices, classification_prompt
-
-
 # ========================
 # NODE-BY-NODE ROUTING CONDITIONS
 # ========================
@@ -415,33 +323,19 @@ def file_convertor_should_go_to_output_formatter(request) -> bool:
 
 
 def file_convertor_should_go_to_vlm_extraction(request) -> bool:
-    """Go to VLM when page classification is requested before OCR."""
-    return bool(request.page_classification_request)
+    """File conversion always routes PDF/image inputs to OCR."""
+    return False
 
 
 def file_convertor_should_go_to_ocr(request) -> bool:
-    """PDF and image inputs need OCR unless the request is page-classification-only."""
-    if request.page_classification_request:
-        needs_ocr_layout = bool(
-            request.figure_summarization
-            or request.chart_extraction
-            or request.table_summarization
-            or request.key_value_extraction
-        )
-        if not needs_ocr_layout:
-            return False
+    """PDF and image inputs need OCR."""
     return True
 
 
 # OCR NODE ROUTING (used by every OCR backend after layout extraction)
 def ocr_should_go_to_output_formatter(request) -> bool:
     """Go to OutputFormatter if no further processing needed"""
-    return not (
-        request.figure_summarization
-        or request.chart_extraction
-        or request.table_summarization
-        or request.page_classification_request
-    )
+    return not request.key_value_extraction
 
 
 def _check_has_table_and_figure_and_chart_and_form(
@@ -542,77 +436,32 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
 
 def dots_ocr_should_go_to_output_formatter(request, parse_result: ParseResult) -> bool:
     """Go to OutputFormatter if no further processing needed for dots-ocr."""
-    has_table, has_figure, has_chart, has_form = _check_has_table_and_figure_and_chart_and_form(
+    has_table, has_figure, _, has_form = _check_has_table_and_figure_and_chart_and_form(
         parse_result
     )
-    return not (
-        (request.figure_summarization and has_figure)
-        or (request.table_summarization and has_table)
-        or (request.chart_extraction and (has_chart or has_figure or has_table))
-        or (request.key_value_extraction and (has_form or has_figure or has_table))
-        or request.page_classification_request
-    )
+    return not (request.key_value_extraction and (has_form or has_figure or has_table))
 
 
 def ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> bool:
     """After OCR, go to VLM if VLM tasks are needed"""
-    has_table, has_figure, has_chart, has_form = _check_has_table_and_figure_and_chart_and_form(
+    has_table, has_figure, _, has_form = _check_has_table_and_figure_and_chart_and_form(
         parse_result
     )
-    return (
-        (request.figure_summarization and has_figure)
-        or (request.table_summarization and has_table)
-        or (request.chart_extraction and (has_figure or has_table))
-        or (request.key_value_extraction and (has_figure or has_table or has_form))
-        or request.page_classification_request
-    )
+    return request.key_value_extraction and (has_figure or has_table or has_form)
 
 
 def dots_ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> bool:
-    """After dots-ocr, go to VLM if VLM tasks are needed.
-
-    Checks table_summarization / figure_summarization explicitly since
-    figure summarization is no longer baked into the dots-ocr path.
-    """
-    has_table, has_figure, has_chart, has_form = _check_has_table_and_figure_and_chart_and_form(
+    """After dots-ocr, go to VLM if key-value extraction has candidate regions."""
+    has_table, has_figure, _, has_form = _check_has_table_and_figure_and_chart_and_form(
         parse_result
     )
-    return (
-        (request.table_summarization and has_table)
-        or (request.figure_summarization and has_figure)
-        or (request.chart_extraction and (has_chart or has_figure or has_table))
-        or (request.key_value_extraction and (has_form or has_figure or has_table))
-        or request.page_classification_request
-    )
+    return request.key_value_extraction and (has_form or has_figure or has_table)
 
 
 # VLM_EXTRACTION NODE ROUTING
 def vlm_extraction_should_go_to_output_formatter(request) -> bool:
     """VLM enrichment always returns to OutputFormatter."""
     return True
-
-
-def pil_image_to_base64(image) -> str:
-    """Convert PIL Image to base64-encoded string (data URI format)"""
-    import base64
-    import io
-
-    # Handle alpha channels
-    if image.mode in ("RGBA", "LA") or (image.mode == "P" and "transparency" in image.info):
-        image = image.convert("RGB")
-
-    # Convert image to bytes
-    buffer = io.BytesIO()
-    # Use JPEG format with compression for preview
-    image.save(buffer, format="JPEG", quality=60)
-    buffer.seek(0)
-
-    # Encode to base64
-    image_bytes = buffer.getvalue()
-    base64_encoded = base64.b64encode(image_bytes).decode("utf-8")
-
-    # Return as data URI
-    return f"data:image/jpeg;base64,{base64_encoded}"
 
 
 async def stream_with_timeout(stream, timeout_seconds: int = 120):

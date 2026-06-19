@@ -1,21 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for pure-logic routing predicates and helpers in pipeline/routing.py."""
 
-import json
-
 import pytest
 
 from tensorlake_docai.models.intermediate_objects import ParseResult
 from tensorlake_docai.models.layout_objects import DocumentLayout, PageLayout, PageLayoutElement
 from tensorlake_docai.pipeline.api import (
-    ClassificationRequest,
-    PageClassDefinition,
     PageFragmentType,
     ParseRequest,
 )
 from tensorlake_docai.pipeline.routing import (
     _check_has_table_and_figure_and_chart_and_form,
-    create_classification_choice_and_prompt,
     dots_ocr_should_go_to_output_formatter,
     dots_ocr_should_go_to_vlm_extraction,
     file_convertor_should_go_to_ocr,
@@ -133,42 +128,6 @@ def test_handle_processing_error_categorisation(message, expected_fragment):
 
 
 # ---------------------------------------------------------------------------
-# create_classification_choice_and_prompt
-# ---------------------------------------------------------------------------
-
-
-def _cls_def(name, desc="desc"):
-    return PageClassDefinition(class_name=name, description=desc)
-
-
-def test_create_classification_choice_and_prompt_multi_class():
-    schema_json, choices, prompt = create_classification_choice_and_prompt(
-        [_cls_def("invoice"), _cls_def("receipt")], "multi_class"
-    )
-    assert "invoice" in choices
-    assert "receipt" in choices
-    assert "unclassified" in choices
-    schema = json.loads(schema_json)
-    assert "page_class" in schema["properties"]
-
-
-def test_create_classification_choice_and_prompt_multi_label():
-    schema_json, choices, prompt = create_classification_choice_and_prompt(
-        [_cls_def("page_a"), _cls_def("page_b")], "multi_label"
-    )
-    schema = json.loads(schema_json)
-    assert "page_classes" in schema["properties"]
-    assert "confidence" in schema["properties"]
-
-
-def test_create_classification_choice_and_prompt_empty_raises():
-    from tensorlake.applications import RequestError as RequestException
-
-    with pytest.raises(RequestException):
-        create_classification_choice_and_prompt([], "multi_class")
-
-
-# ---------------------------------------------------------------------------
 # _check_has_table_and_figure_and_chart_and_form
 # ---------------------------------------------------------------------------
 
@@ -237,13 +196,10 @@ def test_file_convertor_pdf_goes_to_ocr():
     assert not file_convertor_should_go_to_output_formatter(req)
 
 
-def test_file_convertor_pdf_with_page_classification_goes_to_vlm():
-    cls_req = ClassificationRequest(
-        class_definitions=[_cls_def("invoice")], classification_type="multi_class"
-    )
-    req = _req(mime_type="application/pdf", page_classification_request=cls_req)
-    assert file_convertor_should_go_to_vlm_extraction(req)
-    assert not file_convertor_should_go_to_ocr(req)
+def test_file_convertor_never_goes_directly_to_vlm():
+    req = _req(mime_type="application/pdf", key_value_extraction=True)
+    assert not file_convertor_should_go_to_vlm_extraction(req)
+    assert file_convertor_should_go_to_ocr(req)
 
 
 # ---------------------------------------------------------------------------
@@ -256,15 +212,15 @@ def test_ocr_should_go_to_output_formatter_when_no_extras():
     assert ocr_should_go_to_output_formatter(req)
 
 
-def test_ocr_should_go_to_vlm_when_figure_present():
-    req = _req(figure_summarization=True)
-    layout = _layout_with(PageFragmentType.FIGURE)
+def test_ocr_should_go_to_vlm_when_key_value_region_present():
+    req = _req(key_value_extraction=True)
+    layout = _layout_with(PageFragmentType.FORM)
     result = _parse_result(req, layout)
     assert ocr_should_go_to_vlm_extraction(req, result)
 
 
-def test_ocr_should_go_to_vlm_false_when_no_figure():
-    req = _req(figure_summarization=True)
+def test_ocr_should_go_to_vlm_false_when_no_key_value_candidates():
+    req = _req(key_value_extraction=True)
     result = _parse_result(req)
     assert not ocr_should_go_to_vlm_extraction(req, result)
 
@@ -314,8 +270,8 @@ def test_dots_ocr_output_formatter_when_nothing_needed():
     assert dots_ocr_should_go_to_output_formatter(req, result)
 
 
-def test_dots_ocr_vlm_when_table_summarization_and_table_present():
-    req = _req(table_summarization=True)
-    layout = _layout_with(PageFragmentType.TABLE)
+def test_dots_ocr_vlm_when_key_value_candidate_present():
+    req = _req(key_value_extraction=True)
+    layout = _layout_with(PageFragmentType.FORM)
     result = _parse_result(req, layout)
     assert dots_ocr_should_go_to_vlm_extraction(req, result)

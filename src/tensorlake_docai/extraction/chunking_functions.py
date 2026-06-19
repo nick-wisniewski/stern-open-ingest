@@ -7,7 +7,6 @@ from tensorlake_docai.pipeline.api import (
     Chunk,
     ParseRequest,
     Page,
-    PageClass,
 )
 from tensorlake_docai.postprocess.formatter import (
     page_fragment_to_markdown,
@@ -75,32 +74,6 @@ def chunk_document(result: ParseResult) -> ParsedDocument:
         merged_tables=merged_tables,
         document_markdown=document_markdown,
     )
-    page_classes = {}
-    for page_layout in result.document_layout.pages:
-        if page_layout.page_class:
-            classes = page_layout.page_class
-            # convert to list if it's a string
-            if isinstance(classes, str):
-                classes = [classes]
-            for class_name in classes:
-                if class_name not in page_classes:
-                    page_classes[class_name] = PageClass(
-                        page_numbers=[],
-                        page_class=class_name,
-                        classification_reasons={},
-                        classification_confidences={},
-                    )
-                page_classes[class_name].page_numbers.append(page_layout.page_number)
-                if page_layout.classification_reason:
-                    page_classes[class_name].classification_reasons[
-                        page_layout.page_number
-                    ] = page_layout.classification_reason
-                if page_layout.classification_confidence is not None:
-                    page_classes[class_name].classification_confidences[
-                        page_layout.page_number
-                    ] = page_layout.classification_confidence
-
-    parsed_document.page_classes = list(page_classes.values())
 
     return parsed_document
 

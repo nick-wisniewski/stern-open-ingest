@@ -1,12 +1,9 @@
 # SPDX-License-Identifier: Apache-2.0
 """Tests for postprocess.formatter — markdown rendering of page fragments."""
 
-import json
-
 import pytest
 
 from tensorlake_docai.pipeline.api import (
-    Chart,
     Figure,
     ListItem,
     PageFragment,
@@ -152,46 +149,18 @@ def test_caption_like_fragments_pass_through(ftype, request_md):
     assert "caption-x" in out
 
 
-def test_figure_includes_image_and_summary(request_md):
-    fig = Figure(content="raw figure text", summary="a summary", image_base64="BASE64")
+def test_figure_renders_content(request_md):
+    fig = Figure(content="raw figure text")
     out = page_fragment_to_markdown(_frag(PageFragmentType.FIGURE, fig), request_md)
     assert "### Figure" in out
-    assert "![Figure](BASE64)" in out
-    assert "Figure Summary" in out
-    assert "a summary" in out
+    assert "raw figure text" in out
 
 
-def test_figure_omits_image_when_no_base64(request_md):
-    fig = Figure(content="raw figure text", summary="s")
-    out = page_fragment_to_markdown(_frag(PageFragmentType.FIGURE, fig), request_md)
-    assert "![Figure]" not in out
-
-
-def test_figure_collapses_when_summary_matches_content(request_md):
-    fig = Figure(content="same", summary="same", image_base64="X")
-    out = page_fragment_to_markdown(_frag(PageFragmentType.FIGURE, fig), request_md)
-    # No duplicated "Figure Summary" block when summary equals content.
-    assert "Figure Summary" not in out
-
-
-def test_chart_renders_json_block(request_md):
-    chart = Chart(
-        content=json.dumps([{"x": 1, "y": 2}]),
-        image_base64="IMG",
-    )
-    out = page_fragment_to_markdown(_frag(PageFragmentType.CHART, chart), request_md)
-    assert "### Chart" in out
-    assert "![Chart](IMG)" in out
-    assert "```json" in out
-    # Single-element list is unwrapped per formatter logic.
-    assert '"x": 1' in out
-
-
-def test_chart_with_malformed_json_does_not_raise(request_md):
-    chart = Chart(content="not json")
-    out = page_fragment_to_markdown(_frag(PageFragmentType.CHART, chart), request_md)
-    # Falls through to empty JSON block but doesn't blow up.
-    assert "```json" in out
+def test_chart_renders_as_figure_content(request_md):
+    fig = Figure(content="chart OCR text")
+    out = page_fragment_to_markdown(_frag(PageFragmentType.CHART, fig), request_md)
+    assert "### Figure" in out
+    assert "chart OCR text" in out
 
 
 def test_table_uses_markdown_when_mode_is_markdown(request_md):

@@ -1,7 +1,7 @@
 # Open Ingest Pipeline
 
 This document is a visual reference for the current ingestion DAG. The pipeline
-flows: **upload -> file validation -> OCR / layout -> optional VLM enrichment ->
+flows: **upload -> file validation -> OCR / layout -> optional retained enrichment ->
 assembled output**. Each stage is a `@function`/`@cls` task; we run them
 ourselves via the `--local` runner (see [`CLAUDE.md`](../CLAUDE.md)).
 
@@ -19,10 +19,9 @@ flowchart TD
     Validate -->|ok| ValidateQuota[Validate Quotas<br/>Count Pages]
 
     ValidateQuota --> Route{Routing<br/>Decision}
-    Route -->|Page classification only| VLMDirect[VLMExtractionTask]
     Route -->|Need OCR| OCRSelect{OCR Model}
 
-    OCRSelect -->|dots-ocr| DotsOCR[DotsOCRTask<br/>Layout + Markdown<br/>Figure OCR + Barcodes]
+    OCRSelect -->|dots-ocr| DotsOCR[DotsOCRTask<br/>Layout + Markdown<br/>Figure OCR]
     DotsOCR --> HeaderOpt{Header<br/>Correction?}
     HeaderOpt -->|yes| HeaderCorr[Header Correction]
     HeaderOpt -->|no| PostOCR
@@ -35,8 +34,7 @@ flowchart TD
     TableMerging -->|VLM tasks| VLMTask
     TableMerging -->|Done| OutTable[OutputFormatter]
 
-    VLMDirect --> VLMProcess[VLM Batch Processing<br/>Table/Figure Summary<br/>Chart Extraction<br/>Page Classification<br/>Grounding + KV]
-    VLMTask --> VLMProcess
+    VLMTask --> VLMProcess[VLM Batch Processing<br/>Key-Value Extraction]
     VLMProcess --> OutVLM[OutputFormatter]
 
     OutOCR --> Final[ParsedDocumentRef]
@@ -52,30 +50,20 @@ flowchart TD
 
     class FileConv entry
     class DotsOCR ocr
-    class VLMDirect,VLMTask,VLMProcess vlm
+    class VLMTask,VLMProcess vlm
     class OutOCR,OutTable,OutVLM,Final output
     class Validate,Route,OCRSelect,HeaderOpt,PostOCR decision
 ```
 
-## VLM Enrichment
+## Retained VLM Enrichment
 
 ```mermaid
 flowchart TD
     VLMStart[VLMExtractionTask Start] --> BatchCreate[Create Page Image Batches]
     BatchCreate --> Batch{For each batch}
 
-    Batch --> TableSum[Table Summarization]
-    Batch --> FigSum[Figure Summarization]
-    Batch --> Chart[Chart Extraction]
-    Batch --> Grounding[Table / Figure Grounding]
-    Batch --> PageClass[Page Classification]
     Batch --> KV[Key-Value Extraction]
 
-    TableSum --> Update[Update PageLayout In Place]
-    FigSum --> Update
-    Chart --> Update
-    Grounding --> Update
-    PageClass --> Update
     KV --> Update
 
     Update --> More{More batches?}

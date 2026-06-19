@@ -55,3 +55,19 @@ def test_inkwell_only_field_removed():
     # `is_server_presigned_url` was Inkwell-specific and stripped on OSS publish.
     # If it sneaks back in, model_fields will pick it up.
     assert "is_server_presigned_url" not in ParseRequest.model_fields
+
+
+def test_removed_enrichment_fields_stay_removed():
+    removed_fields = {
+        "chart_extraction",
+        "detect_barcode",
+        "figure_ocr_prompt",
+        "figure_summarization",
+        "figure_summarization_prompt",
+        "include_full_page_image",
+        "include_images",
+        "page_classification_request",
+        "table_summarization",
+        "table_summarization_prompt",
+    }
+    assert removed_fields.isdisjoint(ParseRequest.model_fields)

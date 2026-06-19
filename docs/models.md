@@ -6,7 +6,7 @@ AWS Textract, Google Gemini) have been removed. Select the backend via
 `ocr_model` on the `ParseRequest` (it defaults to `dots-ocr`).
 
 > Gemini is still available as an LLM/VLM **provider** (e.g. for table merging
-> and page classification) — it is just no longer an OCR backend.
+> and key-value extraction) — it is just no longer an OCR backend.
 
 ## `dots-ocr`
 
@@ -14,8 +14,8 @@ AWS Textract, Google Gemini) have been removed. Select the backend via
 |---|---|
 | Native PDF | converts pages to images first |
 | Forms / key-value | ✅ |
-| Barcodes | ✅ |
-| Custom figure-OCR prompt | ✅ |
+| Barcodes | no dedicated decoding pass |
+| Custom figure-OCR prompt | no |
 | Hardware | CUDA GPU |
 
 `dots-ocr` runs [DotsOCR](https://github.com/rednote-hilab/dots.mocr) (layout +

@@ -41,15 +41,14 @@ ocr_gpu_cuda_image = (
     Image(base_image=VLLM_BASE_IMAGE, name="documentai/ocr-gpu-cuda")
     .env("DEBIAN_FRONTEND", "noninteractive")
     .run(
-        "apt-get update && apt-get install -y libgl1 libglib2.0-0 git poppler-utils libzbar0 default-jdk && rm -rf /var/lib/apt/lists/*"
+        "apt-get update && apt-get install -y libgl1 libglib2.0-0 git poppler-utils && rm -rf /var/lib/apt/lists/*"
     )
     .run(
         f"pip install '{PYDANTIC_PIN}'"
     )  # enforce exact version after vllm's transitive resolution
-    .run("pip install pyzbar")
     .run("pip install cryptography==46.0.5")
     .run("pip install qwen-vl-utils")
-    .run("pip install markdownify zxing==1.0.3")
+    .run("pip install markdownify")
     .run("pip install pillow numpy")
     .run("pip install pdf2image pypdf")
     .run("pip install opencv-python-headless")  # Headless OpenCV for jdeskew

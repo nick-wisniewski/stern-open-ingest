@@ -84,18 +84,6 @@ def test_pdf_file_goes_to_ocr_by_default():
     assert routing.file_convertor_should_go_to_ocr(req)
 
 
-def test_pdf_with_page_classification_goes_to_vlm():
-    from tensorlake_docai.pipeline.api import ClassificationRequest, PageClassDefinition
-
-    req = _pdf_request(
-        page_classification_request=ClassificationRequest(
-            class_definitions=[PageClassDefinition(class_name="invoice", description="Invoice")],
-        )
-    )
-    assert routing.file_convertor_should_go_to_vlm_extraction(req)
-    assert not routing.file_convertor_should_go_to_ocr(req)
-
-
 # ---- post-OCR routing: bare parse → output formatter ---------------------
 
 
@@ -110,26 +98,17 @@ def test_post_ocr_bare_request_goes_to_output_formatter():
 # ---- post-OCR routing: VLM tasks gated by document content ---------------
 
 
-def test_table_summarization_skipped_when_no_tables_found():
-    req = _pdf_request(ocr_model="dots-ocr", table_summarization=True)
+def test_key_value_extraction_skipped_when_no_candidate_regions_found():
+    req = _pdf_request(ocr_model="dots-ocr", key_value_extraction=True)
     parse_result = _parse_result(req, [_element(PageFragmentType.TEXT, "no tables here")])
 
-    # table_summarization=True but document has no tables → don't go to VLM
+    # key_value_extraction=True but document has no candidate regions → don't go to VLM
     assert not routing.ocr_should_go_to_vlm_extraction(req, parse_result)
     assert routing.ocr_should_go_to_output_formatter(req) is False  # gate is set
-    # Note: ocr_should_go_to_output_formatter is purely flag-driven, so it
-    # returns False whenever any VLM-like flag is set, regardless of content.
 
 
-def test_table_summarization_routes_to_vlm_when_tables_present():
-    req = _pdf_request(ocr_model="dots-ocr", table_summarization=True)
-    parse_result = _parse_result(req, [_element(PageFragmentType.TABLE)])
-
-    assert routing.ocr_should_go_to_vlm_extraction(req, parse_result)
-
-
-def test_figure_summarization_routes_to_vlm_when_figures_present():
-    req = _pdf_request(ocr_model="dots-ocr", figure_summarization=True)
-    parse_result = _parse_result(req, [_element(PageFragmentType.FIGURE)])
+def test_key_value_extraction_routes_to_vlm_when_forms_present():
+    req = _pdf_request(ocr_model="dots-ocr", key_value_extraction=True)
+    parse_result = _parse_result(req, [_element(PageFragmentType.FORM)])
 
     assert routing.ocr_should_go_to_vlm_extraction(req, parse_result)

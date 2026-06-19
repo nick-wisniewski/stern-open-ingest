@@ -92,13 +92,12 @@ That's it. Try a request with `ocr_model="dolphin"`.
 By calling `route_after_ocr`, your backend automatically participates in:
 
 - **Table merging** when the request asks for it and your output contains tables.
-- **VLM enrichment** (figure/table summarization, chart extraction,
-  key-value extraction, page classification) when those flags are
-  set and the relevant fragments exist in your output.
+- **Key-value extraction** when the request asks for it and relevant fragments
+  exist in your output.
 - **Output formatting** as the terminal step.
 
-Pass `dots_ocr=True` if your backend, like `dots_ocr`, gates
-VLM enrichment on the actual presence of tables/figures/forms in the extracted
+Pass `dots_ocr=True` if your backend, like `dots_ocr`, gates key-value
+extraction on the actual presence of tables/figures/forms in the extracted
 layout instead of only the request flags.
 
 ## Hosting concerns

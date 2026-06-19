@@ -215,7 +215,6 @@ def create_page_elements_from_dotsocr_output(
                 markdown=markdown_content,
                 html=text_content if (category == "Table" and text_content) else None,
                 hierarchy_level=hierarchy_level,
-                image_base64=None,  # Will be set later in _process_figures_with_ovis if needed
             )
 
             page_elements.append(page_element)
