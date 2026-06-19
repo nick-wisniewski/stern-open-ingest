@@ -1,0 +1,25 @@
+---
+description: Stern Risk fork of OpenIngest — orientation and hard constraints for AI agents
+alwaysApply: true
+---
+
+# stern-open-ingest
+
+This is Stern Risk's self-hosted fork of Tensorlake's OpenIngest — a standalone
+document-parsing service for insurance policy processing. The Rails app
+(`stern-liability`) calls it as an external provider over HTTP (webhook or poll).
+
+**Read `CLAUDE.md` at the repo root — it is the source of truth.** Re-read it
+before making architectural or deployment changes.
+
+Hard constraints (do not violate without explicit instruction):
+
+- **Self-hosted, not Tensorlake-hosted.** Run via the `--local` runner on our own
+  infra. Never use `tl deploy`, `TENSORLAKE_API_KEY`, or `scripts/sync-secrets.sh`.
+- **`README.md` is upstream context, not our deployment.** It still describes the
+  Tensorlake-hosted runtime and `tl deploy` path — ignore that for how we ship.
+- **Don't assume `dots-ocr`/Ovis is the OCR engine.** We're moving to a lighter
+  backend and a born-digital-first CPU path; check `src/tensorlake_docai/ocr/`
+  for what's actually registered. See `CLAUDE.md` for current direction.
+- After editing Python, run `black`, `ruff check`, and `pytest tests/ -q` before
+  reporting done.
