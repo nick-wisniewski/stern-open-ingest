@@ -15,7 +15,10 @@ from tensorlake_docai.pipeline.api import (
     Usage,
 )
 from tensorlake_docai.models.intermediate_objects import ParseResult
-from tensorlake_docai.extraction.chunking_functions import chunk_document
+from tensorlake_docai.postprocess.formatter import (
+    document_layout_to_document,
+    document_to_markdown,
+)
 
 
 def format_final_output(
@@ -40,13 +43,17 @@ def format_final_output(
 
 
 def _create_parsed_document(result: ParseResult) -> ParsedDocument:
-    """Create ParsedDocument from ParseResult using existing chunking logic."""
-    parsed_document = chunk_document(result)
-    parsed_document.total_pages = (
-        result.document_layout.total_pages if result.document_layout else 0
-    )
+    """Create the Rails-facing ParsedDocument from ParseResult."""
+    if not result.document_layout:
+        return ParsedDocument(document_markdown="")
 
-    return parsed_document
+    pages = document_layout_to_document(
+        result.document_layout.pages,
+        result.document_layout.scale_factor,
+        result.request.ignore_sections,
+        merged_tables=result.document_layout.merged_tables,
+    )
+    return ParsedDocument(document_markdown=document_to_markdown(pages, result.request))
 
 
 def _calculate_usage(
@@ -83,8 +90,6 @@ def _calculate_usage(
 
 def _create_final_output(parsed_document: ParsedDocument, usage: Usage) -> Optional[dict]:
     """Create the final ParsedDocumentRef output."""
-    document = parsed_document.model_dump(
-        exclude={"pages": {"__all__": {"page_fragments": {"__all__": {"bbox"}}}}}
-    )
+    document = {"document_markdown": parsed_document.document_markdown}
     output = ParsedDocumentRef(document=document, usage=usage).model_dump()
     return output

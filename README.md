@@ -102,7 +102,7 @@ keeps running.
 python examples/parse_pdf.py --file my.pdf --ocr-model dots-ocr --local
 ```
 
-Results land in `./debug/` (`document.json` plus one markdown file per chunk).
+Results land in `./debug/` (`document.json` plus `document.md`).
 
 Full walkthrough — every retained `ParseRequest` flag and file input mode — is
 in [`docs/running.md`](docs/running.md).

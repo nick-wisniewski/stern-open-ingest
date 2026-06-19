@@ -1688,7 +1688,7 @@ class TableMerging:
             )
 
             # We need a ParsedDocument to pass to merging functions
-            temp_doc = ParsedDocument(pages=pages, chunks=[])
+            temp_doc = ParsedDocument(pages=pages)
 
             inp, outp, merged_tables = orchestrate_table_merging(temp_doc, result, ctx=ctx)
 

@@ -103,7 +103,7 @@ What `--local` does:
   in your terminal.
 - `dots-ocr` runs in-process too; you need a CUDA GPU on the host.
 
-Output: `./debug/document.json` plus one markdown file per chunk.
+Output: `./debug/document.json` plus `./debug/document.md`.
 
 ---
 
@@ -130,13 +130,12 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--key-value-extraction` | `key_value_extraction` | Key-value region markdown extraction |
 | `--xpage-header-detection` | `xpage_header_detection` | Remove repeating headers/footers |
 
-### Page selection, chunking, table format
+### Page selection and table format
 
 ```bash
 python examples/parse_pdf.py --file my.pdf --local \
     --ocr-model dots-ocr \
     --pages 1 2 5 \
-    --chunk-strategy page \
     --table-output-mode html \
     --table-merging
 ```
@@ -144,7 +143,6 @@ python examples/parse_pdf.py --file my.pdf --local \
 | Flag | Maps to `ParseRequest` field |
 |---|---|
 | `--pages` | `pages_to_parse` (1-indexed) |
-| `--chunk-strategy` | `chunk_strategy` — `none` \| `page` \| `section` \| `fragment` |
 | `--table-output-mode` | `table_output_mode` — `markdown` \| `html` \| `json` |
 | `--ignore-sections` | `ignore_sections` — e.g. `--ignore-sections page_footer figure` |
 
@@ -165,16 +163,14 @@ S3.
 
 ## What you get back
 
-Both examples produce a `ParsedDocument` (`pipeline/api.py`):
+Both examples produce a small response with the rendered markdown and usage metrics:
 
 | Field | Contents |
 |---|---|
-| `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...) and `ref_id`s |
-| `chunks[]` | Flattened content per `chunk_strategy` |
-| `merged_tables[]` | Cross-page table stitching |
+| `document.document_markdown` | Full rendered markdown. Cross-page merged tables are applied here when `table_merging` is enabled. |
 | `usage` | Token counts per stage (OCR / VLM / header correction) |
 
-`parse_pdf.py` writes `./debug/document.json` plus one markdown file per chunk.
+`parse_pdf.py` writes `./debug/document.json` plus `./debug/document.md`.
 
 ---
 

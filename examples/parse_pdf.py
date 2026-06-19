@@ -11,7 +11,7 @@ Usage:
     python examples/parse_pdf.py --file my.pdf --local \
         --table-merging --key-value-extraction --xpage-header-detection
 
-Output: ./debug/document.json plus one ./debug/page_N.md per page.
+Output: ./debug/document.json plus ./debug/document.md.
 """
 
 import argparse
@@ -26,7 +26,6 @@ from tensorlake_docai.pipeline.api import (
     ParsedDocument,
 )
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload
-from tensorlake_docai.postprocess.formatter import page_to_markdown
 
 MIME_BY_EXT = {
     ".pdf": "application/pdf",
@@ -62,7 +61,6 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
         mime_type=mime_type,
         ocr_model=args.ocr_model,
         pages_to_parse=args.pages or None,
-        chunk_strategy=args.chunk_strategy,
         table_output_mode=args.table_output_mode,
         table_merging=args.table_merging,
         key_value_extraction=args.key_value_extraction,
@@ -92,12 +90,6 @@ def main() -> None:
     core.add_argument("--out", default="debug", help="Output directory")
 
     output = parser.add_argument_group("output shape")
-    output.add_argument(
-        "--chunk-strategy",
-        default=None,
-        choices=["none", "page", "section", "fragment"],
-        help="How to chunk the output document",
-    )
     output.add_argument(
         "--table-output-mode",
         default="markdown",
@@ -143,7 +135,7 @@ def main() -> None:
         raise RuntimeError("No document returned")
 
     parsed = ParsedDocument.model_validate(raw["document"])
-    print(f"Parsed {parsed.parsed_pages_count} pages with ocr_model={args.ocr_model}")
+    print(f"Parsed document with ocr_model={args.ocr_model}")
 
     out_dir = Path(args.out)
     if out_dir.exists():
@@ -151,14 +143,7 @@ def main() -> None:
     out_dir.mkdir(parents=True)
 
     (out_dir / "document.json").write_text(parsed.model_dump_json(indent=2))
-
-    for page in parsed.pages or []:
-        (out_dir / f"page_{page.page_number}.md").write_text(page_to_markdown(page, req))
-
-    if args.table_merging and parsed.merged_tables:
-        print(f"Merged tables: {len(parsed.merged_tables)}")
-        for mt in parsed.merged_tables:
-            print(f"  - {mt.merged_table_id}: pages {mt.start_page}-{mt.end_page}")
+    (out_dir / "document.md").write_text(parsed.document_markdown or "")
 
     print(f"Wrote results to {out_dir}/")
 

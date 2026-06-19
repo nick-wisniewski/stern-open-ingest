@@ -2,7 +2,7 @@
 from enum import Enum
 from typing import Dict, List, Literal, Optional, Set, Tuple, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel
 
 # PDF and image inputs accepted by this service (see file_converter.py).
 SUPPORTED_MIME_TYPES = frozenset(
@@ -99,15 +99,6 @@ class Page(BaseModel):
     page_dimensions: Optional[Dict[str, int]] = None
 
 
-class Chunk(BaseModel):
-    content: str
-    page_number: int  # For backward compatibility - the starting page
-    page_numbers: Optional[List[int]] = None  # All pages this chunk spans
-    element_ids: Optional[List[str]] = (
-        None  # ref_ids of elements in this chunk (e.g., ["2.5", "2.6", "3.1"])
-    )
-
-
 class MergeTableActions(BaseModel):
     pages: List[int]
     ref_ids: Optional[List[str]] = None
@@ -125,11 +116,7 @@ class MergedTable(BaseModel):
 
 
 class ParsedDocument(BaseModel):
-    parsed_pages_count: Optional[int] = None
     pages: Optional[List[Page]] = None
-    chunks: List[Chunk]
-    merged_tables: Optional[List[MergedTable]] = None
-    total_pages: Optional[int] = None
     document_markdown: Optional[str] = None  # Full document markdown representation
 
 
@@ -150,29 +137,6 @@ class ParsedDocumentRef(BaseModel):
     usage: Optional[Usage] = None
 
 
-class QuotaResourceType(str, Enum):
-    PAGES_PARSED = "pages_parsed"
-
-
-class ResourceQuotaRequest(BaseModel):
-    # this is to allow the use of alias for the fields
-    model_config = ConfigDict(populate_by_name=True)
-
-    resource_type: QuotaResourceType = Field(alias="resourceType")
-    remaining_quota: int = Field(
-        alias="remainingQuota",
-        description="Remaining quota for this resource type. Use -1 for unlimited quota.",
-    )
-
-
-class OrganizationQuotaRequest(BaseModel):
-    # this is to allow the use of alias for the fields
-    model_config = ConfigDict(populate_by_name=True)
-
-    organization_id: str = Field(alias="organizationId")
-    quotas: List[ResourceQuotaRequest]
-
-
 class ParseRequest(BaseModel):
     file_bytes: Optional[str] = None
     file_url: Optional[str] = None
@@ -182,7 +146,6 @@ class ParseRequest(BaseModel):
     mime_type: str
     skew_correction: bool = False
     debug: bool = False
-    chunk_strategy: Optional[str] = None
     table_parsing_strategy: Optional[Literal["tsr", "vlm"]] = "vlm"
     table_output_mode: Optional[Literal["html", "json", "markdown"]] = "markdown"
     ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
@@ -190,5 +153,4 @@ class ParseRequest(BaseModel):
     table_merging: bool = False
     key_value_extraction: Optional[bool] = False
     ignore_sections: Optional[Set[PageFragmentType]] = None
-    org_quota: Optional[OrganizationQuotaRequest] = None
     xpage_header_detection: bool = False

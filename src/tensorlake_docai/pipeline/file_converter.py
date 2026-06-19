@@ -13,7 +13,6 @@ from tensorlake_docai.vlm.workflow_images import file_convertion_image
 from tensorlake_docai.pipeline.api import (
     ParseRequest,
     Usage,
-    QuotaResourceType,
     SUPPORTED_MIME_TYPES,
 )
 from tensorlake_docai.ocr import resolve_ocr_backend
@@ -136,36 +135,6 @@ def count_document_pages(file_bytes: bytes, mime_type: str, file_name: str = "")
     raise RequestException(message=f"Unsupported file type for page counting: {mime_type}")
 
 
-def validate_quota(request: ParseRequest, total_document_pages: int) -> None:
-    """
-    Validate that the request doesn't exceed any quota limits.
-    Raises an exception if any quota is exceeded.
-
-    Note: A remaining_quota value of -1 indicates unlimited quota (no validation).
-    """
-    if request.org_quota is None:
-        return
-
-    if request.pages_to_parse is not None:
-        pages_to_process = len(request.pages_to_parse)
-    else:
-        pages_to_process = total_document_pages
-
-    for quota in request.org_quota.quotas:
-        if quota.remaining_quota == -1:
-            print(
-                f"Skipping quota validation for {quota.resource_type.value} because it is unlimited"
-            )
-            continue
-
-        if quota.resource_type == QuotaResourceType.PAGES_PARSED:
-            if pages_to_process > quota.remaining_quota:
-                raise RequestException(
-                    message=f"Quota exceeded: Requested {pages_to_process} pages but only "
-                    f"{quota.remaining_quota} pages remaining for {quota.resource_type.value}"
-                )
-
-
 def process_file_from_s3_or_url(request: ParseRequest) -> None:
     """Download (if needed), detect MIME type, and validate the input file."""
     print("DEBUG: Processing file input")
@@ -214,8 +183,6 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
     except Exception as e:
         print(f"Warning: Could not count document pages: {e}")
         total_document_pages = 1
-
-    validate_quota(request, total_document_pages)
 
     if request.pages_to_parse:
         valid_pages = [p for p in request.pages_to_parse if 1 <= p <= total_document_pages]

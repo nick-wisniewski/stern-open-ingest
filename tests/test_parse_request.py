@@ -66,6 +66,8 @@ def test_removed_enrichment_fields_stay_removed():
         "figure_summarization_prompt",
         "include_full_page_image",
         "include_images",
+        "chunk_strategy",
+        "org_quota",
         "page_classification_request",
         "table_summarization",
         "table_summarization_prompt",
