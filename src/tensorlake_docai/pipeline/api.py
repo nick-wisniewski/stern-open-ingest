@@ -197,12 +197,6 @@ class Page(BaseModel):
     classification_confidence: Optional[float] = None
 
 
-class StructuredData(BaseModel):
-    data: Optional[Any]
-    page_numbers: Union[List[int], int]
-    schema_name: Optional[str] = None
-
-
 class Chunk(BaseModel):
     content: str
     page_number: int  # For backward compatibility - the starting page
@@ -240,7 +234,6 @@ class ParsedDocument(BaseModel):
     pages: Optional[List[Page]] = None
     chunks: List[Chunk]
     merged_tables: Optional[List[MergedTable]] = None
-    structured_data: Optional[List[StructuredData]] = None
     total_pages: Optional[int] = None
     page_classes: Optional[List[PageClass]] = None
     document_markdown: Optional[str] = None  # Full document markdown representation
@@ -321,29 +314,6 @@ class ClassificationRequest(BaseModel):
     )
 
 
-# Update partition strategy
-class PatternChunking(BaseModel):
-    strategy: Literal["patterns"]
-    start_patterns: Optional[List[str]] = None
-    end_patterns: Optional[List[str]] = None
-
-
-PartitionStrategy = Union[
-    Literal["none"], Literal["page"], Literal["section"], Literal["fragment"], PatternChunking
-]
-
-
-class StructuredExtractionRequest(BaseModel):
-    json_schema: str
-    prompt: Optional[str] = None
-    model_provider: Optional[str] = None
-    skip_ocr: Optional[bool] = False
-    chunking_strategy: Optional[PartitionStrategy] = None
-    page_classes: Optional[List[str]] = None
-    schema_name: str
-    enable_citation: Optional[bool] = False
-
-
 class ParseRequest(BaseModel):
     file_bytes: Optional[str] = None
     file_url: Optional[str] = None
@@ -359,7 +329,6 @@ class ParseRequest(BaseModel):
     table_output_mode: Optional[Literal["html", "json", "markdown"]] = "markdown"
     ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
     page_classification_request: Optional[ClassificationRequest] = None
-    structured_extraction_requests: Optional[List[StructuredExtractionRequest]] = None
     disable_layout_detection: Optional[bool] = False
     table_summarization: Optional[bool] = False
     table_summarization_prompt: Optional[str] = None

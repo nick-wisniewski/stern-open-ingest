@@ -15,9 +15,7 @@ from tensorlake_docai.pipeline.routing import stream_with_timeout, update_progre
 
 GEMINI_TIMEOUT = 10 * 60  # 10 minutes in total
 DEFAULT_VLM_TIMEOUT = 10 * 60  # 10 minutes in total
-OPENAI_LLM_MODEL_NAME = os.environ.get(
-    "OPENAI_LLM_MODEL_NAME", "gpt-5.1"
-)  # For structured extraction
+OPENAI_LLM_MODEL_NAME = os.environ.get("OPENAI_LLM_MODEL_NAME", "gpt-5.1")  # Default text model
 OPENAI_VLM_MODEL_NAME = os.environ.get(
     "OPENAI_VLM_MODEL_NAME", "gpt-5-mini-2025-08-07"
 )  # For _make_oai_call
@@ -122,7 +120,7 @@ async def _make_gemini_call(
         "max_output_tokens": 64000,  # 8192, double the max tokens so it can handle some super dense tables
         "response_mime_type": (
             "application/json"
-            if job_type in ["structured_extraction", "page_classification", "ocr"]
+            if job_type in ["json_schema", "page_classification", "ocr"]
             else "text/plain"
         ),
         # "thinking_config": types.ThinkingConfig(thinking_budget=0)
@@ -138,7 +136,7 @@ async def _make_gemini_call(
 
     # Conditionally add the appropriate schema field based on job type
     if schema:
-        if job_type in ["structured_extraction", "page_classification"]:
+        if job_type in ["json_schema", "page_classification"]:
             generation_config["response_json_schema"] = schema
         else:
             generation_config["response_schema"] = schema
@@ -298,7 +296,7 @@ async def _make_gemini_call(
             )
 
         # Parse JSON response if needed
-        if job_type in ["structured_extraction", "page_classification", "ocr"]:
+        if job_type in ["json_schema", "page_classification", "ocr"]:
             try:
                 _ = json.loads(accumulated_text)
             except json.JSONDecodeError as e:
@@ -667,7 +665,7 @@ async def run_clients(
             # Regular errors: standard exponential backoff (1s, 2s, 4s)
             return 2**attempt
 
-    model = models[0] if job_type in ["structured_extraction"] else models[1]
+    model = models[0] if job_type in ["json_schema"] else models[1]
     model_name = model.__name__
 
     # Get or create semaphore for current event loop

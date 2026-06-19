@@ -11,14 +11,14 @@ To add a new backend, see ``ocr/README.md``. The short version:
 1. Create ``ocr/<your_backend>.py`` that defines a class matching the
    :class:`OCRTask` protocol below.
 2. End ``run`` with ``return route_after_ocr(parse_result, log_prefix=...)``
-   so the downstream TableMerging / StructuredExtraction / VLM / Output
-   dispatch stays consistent with the other backends.
+   so the downstream TableMerging / VLM / Output dispatch stays consistent
+   with the other backends.
 3. Add one line to :data:`tensorlake_docai.ocr.OCR_BACKENDS` mapping your
    public model name to the dotted class path, widen the ``ocr_model``
    ``Literal`` in ``pipeline/api.py``, and import the class in
    ``workflow.py`` so ``tl deploy`` picks it up.
 
-See ``ocr/gemini.py`` for the canonical reference implementation.
+See ``ocr/dots_ocr.py`` for the canonical reference implementation.
 """
 
 from typing import Protocol, runtime_checkable

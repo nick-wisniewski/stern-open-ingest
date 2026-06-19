@@ -441,23 +441,15 @@ def file_convertor_should_go_to_output_formatter(request) -> bool:
 
 
 def file_convertor_should_go_to_vlm_extraction(request) -> bool:
-    """Go to VLM when skip_ocr is enabled or page classification is requested."""
-    return should_skip_ocr(request) or bool(request.page_classification_request)
-
-
-def file_convertor_should_go_to_structured_extraction(request) -> bool:
-    """Structured extraction on PDF/images runs after OCR (or via skip_ocr → VLM)."""
-    return False
+    """Go to VLM when page classification is requested before OCR."""
+    return bool(request.page_classification_request)
 
 
 def file_convertor_should_go_to_ocr(request) -> bool:
-    """PDF and image inputs need OCR unless skip_ocr or page-classification-only."""
-    if should_skip_ocr(request):
-        return False
+    """PDF and image inputs need OCR unless the request is page-classification-only."""
     if request.page_classification_request:
         needs_ocr_layout = bool(
-            request.structured_extraction_requests
-            or request.figure_summarization
+            request.figure_summarization
             or request.figure_grounding
             or request.chart_extraction
             or request.table_summarization
@@ -473,8 +465,7 @@ def file_convertor_should_go_to_ocr(request) -> bool:
 def ocr_should_go_to_output_formatter(request) -> bool:
     """Go to OutputFormatter if no further processing needed"""
     return not (
-        request.structured_extraction_requests
-        or request.figure_summarization
+        request.figure_summarization
         or request.figure_grounding
         or request.chart_extraction
         or request.table_summarization
@@ -534,16 +525,15 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
     """Dispatch an OCR backend's output to the next pipeline step.
 
     Every OCR backend ends with the same downstream choice: TableMerging if
-    tables exist and ``table_merging`` was requested; otherwise VLM,
-    StructuredExtraction, or OutputFormatter depending on which post-OCR
-    tasks the request asked for.
+    tables exist and ``table_merging`` was requested; otherwise VLM or
+    OutputFormatter depending on which post-OCR tasks the request asked for.
 
     Args:
         parse_result: ParseResult produced by the OCR backend.
         log_prefix: Tag for ``🔀`` log lines (e.g. ``"FULL_PAGE_AZURE"``).
         dots_ocr: If True, use the dots-ocr predicates that additionally
-            gate VLM/SE on the actual presence of tables/figures/forms in
-            the extracted layout.
+            gate VLM on the actual presence of tables/figures/forms in the
+            extracted layout.
 
     Returns:
         Either a ``ParseResult`` (terminal OutputFormatter step) or a
@@ -553,9 +543,6 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
     # top-level import here would create a cycle.
     from tensorlake_docai.pipeline.output_formatter import format_final_output
     from tensorlake_docai.vlm.cloud import VLMExtractionTask
-    from tensorlake_docai.extraction.structured_extraction_functions import (
-        StructuredExtraction,
-    )
     from tensorlake_docai.tables.table_merging import TableMerging
 
     request = parse_result.request
@@ -567,11 +554,9 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
     if dots_ocr:
         go_output = dots_ocr_should_go_to_output_formatter(request, parse_result)
         go_vlm = dots_ocr_should_go_to_vlm_extraction(request, parse_result)
-        go_se = dots_ocr_should_go_to_structured_extraction(request, parse_result)
     else:
         go_output = ocr_should_go_to_output_formatter(request)
         go_vlm = ocr_should_go_to_vlm_extraction(request, parse_result)
-        go_se = ocr_should_go_to_structured_extraction(request, parse_result)
 
     if go_output:
         print(f"🔀 {log_prefix} → OutputFormatter")
@@ -580,10 +565,6 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
     if go_vlm:
         print(f"🔀 {log_prefix} → VLMExtractionTask")
         return VLMExtractionTask().run.future(parse_result)
-
-    if go_se:
-        print(f"🔀 {log_prefix} → StructuredExtraction")
-        return StructuredExtraction().run.future(parse_result)
 
     print(f"🔀 {log_prefix} → OutputFormatter")
     return format_final_output(parse_result)
@@ -595,8 +576,7 @@ def dots_ocr_should_go_to_output_formatter(request, parse_result: ParseResult) -
         parse_result
     )
     return not (
-        request.structured_extraction_requests
-        or (request.figure_summarization and has_figure)
+        (request.figure_summarization and has_figure)
         or (request.table_summarization and has_table)
         or (request.table_cell_grounding and has_table)
         or (request.figure_grounding and has_figure)
@@ -619,7 +599,6 @@ def ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> bool:
         or (request.key_value_extraction and (has_figure or has_table or has_form))
         or (request.figure_grounding and has_figure)
         or request.page_classification_request
-        or should_skip_ocr(request)
     )
 
 
@@ -640,49 +619,13 @@ def dots_ocr_should_go_to_vlm_extraction(request, parse_result: ParseResult) -> 
         or (request.key_value_extraction and (has_form or has_figure or has_table))
         or (request.figure_grounding and has_figure)
         or request.page_classification_request
-        or should_skip_ocr(request)
     )
-
-
-def ocr_should_go_to_structured_extraction(request, parse_result: ParseResult) -> bool:
-    """Go to StructuredExtraction if SE needed but no VLM tasks"""
-    has_structured_extraction = bool(request.structured_extraction_requests)
-
-    has_vlm_tasks = ocr_should_go_to_vlm_extraction(request, parse_result)
-
-    return has_structured_extraction and not has_vlm_tasks
-
-
-def dots_ocr_should_go_to_structured_extraction(request, parse_result: ParseResult) -> bool:
-    """Go to StructuredExtraction if SE needed but no VLM tasks"""
-    has_structured_extraction = bool(request.structured_extraction_requests)
-
-    has_vlm_tasks = dots_ocr_should_go_to_vlm_extraction(request, parse_result)
-
-    return has_structured_extraction and not has_vlm_tasks
 
 
 # VLM_EXTRACTION NODE ROUTING
 def vlm_extraction_should_go_to_output_formatter(request) -> bool:
-    """Go to OutputFormatter if no structured extraction needed"""
-    return not request.structured_extraction_requests
-
-
-def vlm_extraction_should_go_to_structured_extraction(request) -> bool:
-    """Go to StructuredExtraction if SE needed and skip_ocr is false"""
-    return bool(request.structured_extraction_requests) and not should_skip_ocr(request)
-
-
-# HELPER FUNCTIONS
-def skip_ocr_requests(request):
-    """Return the subset of structured_extraction_requests with skip_ocr=True."""
-    return [req for req in (request.structured_extraction_requests or []) if req.skip_ocr]
-
-
-def should_skip_ocr(request) -> bool:
-    """OCR is skipped only when every structured-extraction request opts out of OCR."""
-    reqs = request.structured_extraction_requests or []
-    return bool(reqs) and all(req.skip_ocr for req in reqs)
+    """VLM enrichment always returns to OutputFormatter."""
+    return True
 
 
 def pil_image_to_base64(image) -> str:

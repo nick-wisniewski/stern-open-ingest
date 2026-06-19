@@ -33,12 +33,10 @@ from tensorlake_docai.pipeline.routing import (
     should_route_to_table_merging,
     dots_ocr_should_go_to_output_formatter,
     dots_ocr_should_go_to_vlm_extraction,
-    dots_ocr_should_go_to_structured_extraction,
 )
 from tensorlake_docai.ocr.utils import BatchProcessor
 from tensorlake_docai.tables.table_merging import TableMerging
 from tensorlake_docai.vlm.cloud import VLMExtractionTask
-from tensorlake_docai.extraction.structured_extraction_functions import StructuredExtraction
 
 SECRETS: list[str] = []
 
@@ -658,10 +656,6 @@ class OvisFigureOCRTask(BatchProcessor):
         elif dots_ocr_should_go_to_vlm_extraction(parse_result.request, parse_result):
             print("🔀 OvisFigureOCRTask → VLMExtractionTask")
             return VLMExtractionTask().run.future(parse_result)
-
-        elif dots_ocr_should_go_to_structured_extraction(parse_result.request, parse_result):
-            print("🔀 OvisFigureOCRTask → StructuredExtraction")
-            return StructuredExtraction().run.future(parse_result)
 
         else:
             print("🔀 OvisFigureOCRTask → OutputFormatter")

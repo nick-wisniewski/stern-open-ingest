@@ -395,11 +395,6 @@ QWEN_TABLE_TO_MARKDOWN_PROMPT = "Convert the document fragment to markdown. Do n
 QWEN_TABLE_TO_HTML_SYSTEM_PROMPT = "You are an AI assistant specialized in recognizing and extracting text from images. Your mission is to analyze the image and generate result in HTML and only use the text in the image."
 QWEN_TABLE_TO_HTML_PROMPT = "Convert the document fragment to HTML. Do not include the text not on the image, do not include other outputs."
 
-STRUCTURED_EXTRACTION_SYSTEM_PROMPT = """You are an AI specialized in recognizing and extracting text from images. Your mission is to analyze the image document and generate the result in the given JSON schema. Return null if you can't find the data in the image."""
-STRUCTURED_EXTRACTION_PROMPT = (
-    """Extract the data from the image and return it in the given JSON schema."""
-)
-
 
 def get_prompt_messages(cls: PageFragmentType) -> list[str]:
     if cls in [PageFragmentType.TABLE]:

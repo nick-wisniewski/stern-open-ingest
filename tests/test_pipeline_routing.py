@@ -5,9 +5,8 @@ Exercises the real routing predicates against constructed `ParseRequest` and
 `ParseResult` objects — no network, no provider clients, no LLMs. The intent
 is to lock in the public contract: for each supported `ocr_model`, the
 file-convertor stage routes to the correct OCR provider task; once OCR
-finishes, the post-OCR stage routes to output formatting, structured
-extraction, or VLM extraction based on the request flags + actual document
-content.
+finishes, the post-OCR stage routes to output formatting or VLM extraction
+based on the request flags + actual document content.
 
 This is the highest-leverage pipeline test we can write without standing up
 the full tensorlake workflow runtime.
@@ -83,7 +82,6 @@ def test_pdf_file_goes_to_ocr_by_default():
     req = _pdf_request()
     assert not routing.file_convertor_should_go_to_output_formatter(req)
     assert routing.file_convertor_should_go_to_ocr(req)
-    assert not routing.file_convertor_should_go_to_structured_extraction(req)
 
 
 def test_pdf_with_page_classification_goes_to_vlm():
@@ -106,29 +104,6 @@ def test_post_ocr_bare_request_goes_to_output_formatter():
     parse_result = _parse_result(req, [_element(PageFragmentType.TEXT, "hello")])
 
     assert routing.ocr_should_go_to_output_formatter(req)
-    assert not routing.ocr_should_go_to_structured_extraction(req, parse_result)
-    assert not routing.ocr_should_go_to_vlm_extraction(req, parse_result)
-
-
-# ---- post-OCR routing: structured extraction requested -------------------
-
-
-def test_post_ocr_structured_extraction_routes_to_se():
-    from tensorlake_docai.pipeline.api import StructuredExtractionRequest
-
-    req = _pdf_request(
-        ocr_model="dots-ocr",
-        structured_extraction_requests=[
-            StructuredExtractionRequest(
-                json_schema='{"type":"object"}',
-                schema_name="x",
-            )
-        ],
-    )
-    parse_result = _parse_result(req, [_element(PageFragmentType.TEXT, "hello")])
-
-    assert routing.ocr_should_go_to_structured_extraction(req, parse_result)
-    assert not routing.ocr_should_go_to_output_formatter(req)
     assert not routing.ocr_should_go_to_vlm_extraction(req, parse_result)
 
 
@@ -158,25 +133,3 @@ def test_figure_summarization_routes_to_vlm_when_figures_present():
     parse_result = _parse_result(req, [_element(PageFragmentType.FIGURE)])
 
     assert routing.ocr_should_go_to_vlm_extraction(req, parse_result)
-
-
-# ---- should_skip_ocr -----------------------------------------------------
-
-
-def test_should_skip_ocr_default_false():
-    assert not routing.should_skip_ocr(_pdf_request())
-
-
-def test_should_skip_ocr_when_structured_extraction_says_so():
-    from tensorlake_docai.pipeline.api import StructuredExtractionRequest
-
-    req = _pdf_request(
-        structured_extraction_requests=[
-            StructuredExtractionRequest(
-                json_schema='{"type":"object"}',
-                schema_name="x",
-                skip_ocr=True,
-            )
-        ]
-    )
-    assert routing.should_skip_ocr(req)

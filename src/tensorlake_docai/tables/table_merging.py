@@ -25,11 +25,9 @@ from tensorlake.applications import cls, function, RequestError as RequestExcept
 from tensorlake_docai.vlm.workflow_images import table_merging_image
 from tensorlake_docai.postprocess.formatter import document_layout_to_document
 from tensorlake_docai.pipeline.output_formatter import format_final_output
-from tensorlake_docai.extraction.structured_extraction_functions import StructuredExtraction
 from tensorlake_docai.vlm.cloud import VLMExtractionTask
 from tensorlake_docai.pipeline.routing import (
     ocr_should_go_to_output_formatter,
-    ocr_should_go_to_structured_extraction,
     ocr_should_go_to_vlm_extraction,
     dots_ocr_should_go_to_vlm_extraction,
     is_markdown_table,
@@ -627,7 +625,7 @@ async def parse_single_prompt(
             user_prompt=full_prompt,
             images=images or [],
             models=[_make_gemini_call],
-            job_type="structured_extraction",
+            job_type="json_schema",
             json_schema=json_schema,
         )
     except Exception as e:
@@ -1760,11 +1758,8 @@ class TableMerging:
         if ocr_should_go_to_output_formatter(result.request):
             print("🔀 TableMerging → OutputFormatter")
             return format_final_output(result)
-        elif ocr_should_go_to_structured_extraction(result.request, result):
-            print("🔀 TableMerging → StructuredExtraction")
-            return StructuredExtraction().run.future(result)
         # Special handling for VLM extraction to support dots-ocr
-        elif ocr_should_go_to_vlm_extraction(result.request, result) or (
+        if ocr_should_go_to_vlm_extraction(result.request, result) or (
             result.request.ocr_model == "dots-ocr"
             and dots_ocr_should_go_to_vlm_extraction(result.request, result)
         ):

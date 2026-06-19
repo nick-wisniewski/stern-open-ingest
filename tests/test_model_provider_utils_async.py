@@ -352,8 +352,8 @@ def test_make_oai_call_skips_zero_size_image():
 # ---------------------------------------------------------------------------
 
 
-def test_run_clients_calls_first_model_for_structured_extraction():
-    """run_clients picks models[0] for structured_extraction job_type."""
+def test_run_clients_calls_first_model_for_json_schema_jobs():
+    """run_clients picks models[0] for schema-constrained JSON jobs."""
     from tensorlake_docai.providers.model_provider_utils import run_clients
 
     async def mock_model_0(prompt, images, page_image, json_schema, job_type, **kw):
@@ -368,7 +368,7 @@ def test_run_clients_calls_first_model_for_structured_extraction():
                 user_prompt="test",
                 images=[],
                 models=[mock_model_0, mock_model_1],
-                job_type="structured_extraction",
+                job_type="json_schema",
             )
 
     text, _, _ = asyncio.run(run())
@@ -376,7 +376,7 @@ def test_run_clients_calls_first_model_for_structured_extraction():
 
 
 def test_run_clients_calls_second_model_for_other_job_types():
-    """run_clients picks models[1] for non-structured_extraction job types."""
+    """run_clients picks models[1] for non-schema job types."""
     from tensorlake_docai.providers.model_provider_utils import run_clients
 
     async def mock_model_0(prompt, images, page_image, json_schema, job_type, **kw):
@@ -418,7 +418,7 @@ def test_run_clients_retries_on_request_exception():
                 user_prompt="test",
                 images=[],
                 models=[flaky_model, flaky_model],
-                job_type="structured_extraction",
+                job_type="json_schema",
             )
 
     text, _, _ = asyncio.run(run())
@@ -444,7 +444,7 @@ def test_run_clients_schema_error_does_not_retry():
                 user_prompt="test",
                 images=[],
                 models=[bad_schema_model, bad_schema_model],
-                job_type="structured_extraction",
+                job_type="json_schema",
             )
 
     with pytest.raises(RequestException, match="SCHEMA_ERROR"):
@@ -466,7 +466,7 @@ def test_run_clients_raises_after_all_retries_exhausted():
                 user_prompt="test",
                 images=[],
                 models=[always_fails, always_fails],
-                job_type="structured_extraction",
+                job_type="json_schema",
             )
 
     with pytest.raises(RequestException):
@@ -487,7 +487,7 @@ def test_run_clients_none_output_raises():
                 user_prompt="test",
                 images=[],
                 models=[null_model, null_model],
-                job_type="structured_extraction",
+                job_type="json_schema",
             )
 
     with pytest.raises(RequestException):

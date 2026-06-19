@@ -12,13 +12,11 @@ from tensorlake_docai.pipeline.api import (
     PageClassDefinition,
     PageFragmentType,
     ParseRequest,
-    StructuredExtractionRequest,
 )
 from tensorlake_docai.pipeline.routing import (
     _check_has_table_and_figure_and_chart_and_form,
     create_classification_choice_and_prompt,
     dots_ocr_should_go_to_output_formatter,
-    dots_ocr_should_go_to_structured_extraction,
     dots_ocr_should_go_to_vlm_extraction,
     file_convertor_should_go_to_ocr,
     file_convertor_should_go_to_output_formatter,
@@ -27,12 +25,9 @@ from tensorlake_docai.pipeline.routing import (
     is_markdown_table,
     markdown_to_html_table,
     ocr_should_go_to_output_formatter,
-    ocr_should_go_to_structured_extraction,
     ocr_should_go_to_vlm_extraction,
     should_route_to_table_merging,
-    should_skip_ocr,
     vlm_extraction_should_go_to_output_formatter,
-    vlm_extraction_should_go_to_structured_extraction,
 )
 
 # ---------------------------------------------------------------------------
@@ -44,14 +39,6 @@ def _req(**kwargs) -> ParseRequest:
     defaults = dict(file_name="test.pdf", mime_type="application/pdf")
     defaults.update(kwargs)
     return ParseRequest(**defaults)
-
-
-def _se_req(skip_ocr=False) -> StructuredExtractionRequest:
-    return StructuredExtractionRequest(
-        json_schema='{"type": "object"}',
-        schema_name="test",
-        skip_ocr=skip_ocr,
-    )
 
 
 def _layout_with(*fragment_types) -> DocumentLayout:
@@ -240,39 +227,14 @@ def test_check_detects_markdown_table_in_text_element():
 
 
 # ---------------------------------------------------------------------------
-# should_skip_ocr
-# ---------------------------------------------------------------------------
-
-
-def test_should_skip_ocr_all_skip():
-    req = _req(structured_extraction_requests=[_se_req(skip_ocr=True), _se_req(skip_ocr=True)])
-    assert should_skip_ocr(req)
-
-
-def test_should_skip_ocr_mixed_returns_false():
-    req = _req(structured_extraction_requests=[_se_req(skip_ocr=True), _se_req(skip_ocr=False)])
-    assert not should_skip_ocr(req)
-
-
-def test_should_skip_ocr_no_requests_returns_false():
-    assert not should_skip_ocr(_req())
-
-
-# ---------------------------------------------------------------------------
 # file_convertor_should_go_to_* predicates
 # ---------------------------------------------------------------------------
 
 
-def test_file_convertor_pdf_no_skip_ocr_goes_to_ocr():
+def test_file_convertor_pdf_goes_to_ocr():
     req = _req(mime_type="application/pdf")
     assert file_convertor_should_go_to_ocr(req)
     assert not file_convertor_should_go_to_output_formatter(req)
-
-
-def test_file_convertor_pdf_with_skip_ocr_goes_to_vlm():
-    req = _req(mime_type="application/pdf", structured_extraction_requests=[_se_req(skip_ocr=True)])
-    assert file_convertor_should_go_to_vlm_extraction(req)
-    assert not file_convertor_should_go_to_ocr(req)
 
 
 def test_file_convertor_pdf_with_page_classification_goes_to_vlm():
@@ -294,11 +256,6 @@ def test_ocr_should_go_to_output_formatter_when_no_extras():
     assert ocr_should_go_to_output_formatter(req)
 
 
-def test_ocr_should_go_to_output_formatter_false_with_se():
-    req = _req(structured_extraction_requests=[_se_req()])
-    assert not ocr_should_go_to_output_formatter(req)
-
-
 def test_ocr_should_go_to_vlm_when_figure_present():
     req = _req(figure_summarization=True)
     layout = _layout_with(PageFragmentType.FIGURE)
@@ -310,22 +267,6 @@ def test_ocr_should_go_to_vlm_false_when_no_figure():
     req = _req(figure_summarization=True)
     result = _parse_result(req)
     assert not ocr_should_go_to_vlm_extraction(req, result)
-
-
-def test_ocr_should_go_to_structured_extraction():
-    req = _req(structured_extraction_requests=[_se_req()])
-    result = _parse_result(req)
-    assert ocr_should_go_to_structured_extraction(req, result)
-
-
-def test_ocr_should_not_go_to_se_when_vlm_needed():
-    req = _req(
-        structured_extraction_requests=[_se_req()],
-        figure_summarization=True,
-    )
-    layout = _layout_with(PageFragmentType.FIGURE)
-    result = _parse_result(req, layout)
-    assert not ocr_should_go_to_structured_extraction(req, result)
 
 
 # ---------------------------------------------------------------------------
@@ -362,16 +303,6 @@ def test_vlm_should_go_to_output_formatter_when_no_se():
     assert vlm_extraction_should_go_to_output_formatter(_req())
 
 
-def test_vlm_should_go_to_structured_extraction():
-    req = _req(structured_extraction_requests=[_se_req(skip_ocr=False)])
-    assert vlm_extraction_should_go_to_structured_extraction(req)
-
-
-def test_vlm_should_not_go_to_se_when_skip_ocr():
-    req = _req(structured_extraction_requests=[_se_req(skip_ocr=True)])
-    assert not vlm_extraction_should_go_to_structured_extraction(req)
-
-
 # ---------------------------------------------------------------------------
 # dots_ocr_should_go_to_* predicates
 # ---------------------------------------------------------------------------
@@ -383,20 +314,8 @@ def test_dots_ocr_output_formatter_when_nothing_needed():
     assert dots_ocr_should_go_to_output_formatter(req, result)
 
 
-def test_dots_ocr_output_formatter_false_with_se():
-    req = _req(structured_extraction_requests=[_se_req()])
-    result = _parse_result(req)
-    assert not dots_ocr_should_go_to_output_formatter(req, result)
-
-
 def test_dots_ocr_vlm_when_table_summarization_and_table_present():
     req = _req(table_summarization=True)
     layout = _layout_with(PageFragmentType.TABLE)
     result = _parse_result(req, layout)
     assert dots_ocr_should_go_to_vlm_extraction(req, result)
-
-
-def test_dots_ocr_se_when_se_needed_and_no_vlm():
-    req = _req(structured_extraction_requests=[_se_req()])
-    result = _parse_result(req)
-    assert dots_ocr_should_go_to_structured_extraction(req, result)

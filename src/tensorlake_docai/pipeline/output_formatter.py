@@ -7,11 +7,9 @@ the final ParsedDocumentRef output format, handling all token aggregation
 consistently.
 """
 
-import json
-from typing import Optional, List, Dict, Any
+from typing import Optional
 
 from tensorlake_docai.pipeline.api import (
-    StructuredData,
     ParsedDocumentRef,
     ParsedDocument,
     Usage,
@@ -34,7 +32,6 @@ def format_final_output(
     """
     print("=== format_final_output ===")
     parsed_document = _create_parsed_document(result)
-    _attach_structured_data(parsed_document, result)
     usage = _calculate_usage(result)
     final_output = _create_final_output(parsed_document, usage)
     print("=== end of format_final_output ===")
@@ -54,52 +51,6 @@ def _create_parsed_document(result: ParseResult) -> ParsedDocument:
         parsed_document.form_filling_metadata = result.form_filling_result.metadata
 
     return parsed_document
-
-
-def _attach_structured_data(parsed_document: ParsedDocument, result: ParseResult) -> None:
-    """
-    Attach structured data to the parsed document.
-    """
-    if not result.structured_outputs_by_page:
-        return
-
-    structured_data_results = _process_structured_outputs(result.structured_outputs_by_page)
-
-    if structured_data_results:
-        parsed_document.structured_data = structured_data_results
-
-
-def _process_structured_outputs(
-    structured_outputs_by_page: Dict[Any, Any],
-) -> List[StructuredData]:
-    """
-    Process structured outputs from `structured_outputs_by_page`.
-    """
-    structured_data_pages = []
-
-    for page_key, structured_output in structured_outputs_by_page.items():
-        try:
-            # page_key shape is (page_number_or_tuple, chunk_index); unpack to a flat page list.
-            if isinstance(page_key, tuple) and len(page_key) == 2:
-                pages = list(page_key[0]) if isinstance(page_key[0], tuple) else [page_key[0]]
-            else:
-                pages = list(page_key) if isinstance(page_key, tuple) else [page_key]
-
-            for schema_name, result_data in structured_output.items():
-                structured_data_pages.append(
-                    StructuredData(
-                        data=(
-                            json.loads(result_data) if isinstance(result_data, str) else result_data
-                        ),
-                        page_numbers=pages,
-                        schema_name=schema_name,
-                    )
-                )
-        except Exception as e:
-            print(f"Error processing structured output: {e}\n\n{structured_output}")
-            raise Exception(f"Error processing structured output: {e}")
-
-    return structured_data_pages
 
 
 def _calculate_usage(

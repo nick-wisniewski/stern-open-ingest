@@ -9,7 +9,6 @@ from tensorlake.applications import application, function, Retries
 from tensorlake.applications import RequestError as RequestException
 from tensorlake_docai.vlm.cloud import VLMExtractionTask
 from tensorlake_docai.pipeline.output_formatter import format_final_output
-from tensorlake_docai.extraction.structured_extraction_functions import StructuredExtraction
 from tensorlake_docai.extraction.form_filling import FormFilling
 from tensorlake_docai.vlm.workflow_images import file_convertion_image
 from tensorlake_docai.pipeline.api import (
@@ -24,7 +23,6 @@ from tensorlake_docai.pipeline.routing import (
     download_file,
     file_convertor_should_go_to_output_formatter,
     file_convertor_should_go_to_vlm_extraction,
-    file_convertor_should_go_to_structured_extraction,
     file_convertor_should_go_to_ocr,
 )
 from tensorlake_docai.models.intermediate_objects import ParseResult
@@ -229,17 +227,6 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
 
     validate_quota(request, total_document_pages)
 
-    se_requests = request.structured_extraction_requests or []
-    for se_req in se_requests:
-        if se_req.page_classes and not request.page_classification_request:
-            raise RequestException(
-                message=(
-                    f"structured_extraction_request specifies page_classes "
-                    f"{se_req.page_classes!r} but page_classification_request is not set. "
-                    f"Enable page classification in your request before filtering by page_classes."
-                )
-            )
-
     if request.pages_to_parse:
         valid_pages = [p for p in request.pages_to_parse if 1 <= p <= total_document_pages]
         invalid_pages = [p for p in request.pages_to_parse if p < 1 or p > total_document_pages]
@@ -292,10 +279,6 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
     if file_convertor_should_go_to_vlm_extraction(request):
         print("🔀 FILE_CONVERTOR → VLMExtractionTask")
         return VLMExtractionTask().run.future(parse_result)
-
-    if file_convertor_should_go_to_structured_extraction(request):
-        print("🔀 FILE_CONVERTOR → StructuredExtraction")
-        return StructuredExtraction().run.future(parse_result)
 
     if file_convertor_should_go_to_ocr(request):
         backend_cls = resolve_ocr_backend(request.ocr_model)

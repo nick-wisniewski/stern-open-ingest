@@ -2,7 +2,6 @@
 # Document Understanding Tasks. This function batches the post-OCR VLM passes:
 # 1. Figure and Table summarization
 # 2. Page classification
-# 3. Structured extraction when skip_ocr is True
 
 import asyncio
 import json
@@ -22,17 +21,12 @@ from tensorlake_docai.vlm.element_summary_utils import (
     run_element_summary_and_modify_page_elements,
 )
 from tensorlake.applications import function, Retries, cls, RequestContext
-from tensorlake.applications import RequestError as RequestException
 from tensorlake_docai.vlm.workflow_images import vlm_extraction_image
 from tensorlake_docai.pipeline.routing import (
     create_classification_choice_and_prompt,
-    skip_ocr_requests,
-    vlm_extraction_should_go_to_structured_extraction,
 )
-from tensorlake_docai.extraction.chunking_functions import ChunkingStrategy
 from tensorlake_docai.pipeline.simple_page_creator import ImageDimensions
 from tensorlake_docai.pipeline.output_formatter import format_final_output
-from tensorlake_docai.extraction.structured_extraction_functions import StructuredExtraction
 from tensorlake_docai.extraction.form_extraction_utils import (
     run_element_form_extraction_and_modify_page_elements,
 )
@@ -421,145 +415,6 @@ class VLMExtractionTask(BatchProcessor):
         end_time = time.time()
         print(f"Time taken for {element_name} summary: {end_time - start_time} seconds")
 
-    async def _prepare_and_run_extraction(
-        self, extraction_request, document_pages, page_images_dict, pdf_bytes=None
-    ):
-        """
-        Prepare and run structured extraction for a single extraction request.
-
-        Args:
-            extraction_request: StructuredExtractionRequest object
-            document_pages: List of page layouts to process for this extraction request
-            page_images_dict: Dictionary of page images
-            pdf_bytes: Optional PDF bytes for direct PDF processing
-
-        Returns:
-            Dict mapping page numbers to extraction results
-        """
-        from tensorlake_docai.providers.model_provider_utils import _make_gemini_call, run_clients
-        import io
-        import fitz  # PyMuPDF
-
-        outputs_by_page = {}
-
-        # We pass the schema as a string, because the underlying model providers expect a string
-        json_schema = extraction_request.json_schema
-
-        chunk_strategy = extraction_request.chunking_strategy
-
-        # pages to process for this extraction request
-        target_pages = document_pages
-
-        page_images_for_extraction = []
-        page_numbers_for_extraction = []
-        pdf_bytes_for_extraction = []
-
-        # Handle different chunking strategies
-        # for skip_ocr, we only need per page chunking or None chunking
-        if chunk_strategy == ChunkingStrategy.PAGE.value:
-            # Process each page individually
-            # For PAGE chunking, use rendered images instead of extracting PDFs
-            # (extracting single pages as PDFs creates bloated files with all fonts/resources)
-            for page in target_pages:
-                page_image = page_images_dict.get(page.page_number)
-                if page_image:
-                    page_images_for_extraction.append([page_image])
-                    page_numbers_for_extraction.append([page.page_number])
-                    pdf_bytes_for_extraction.append(None)
-        else:
-            # Process all pages together
-            if pdf_bytes:
-                # For PDF, extract subset of pages if needed
-                pdf_doc = fitz.open(stream=io.BytesIO(pdf_bytes), filetype="pdf")
-                target_page_numbers = [page.page_number for page in target_pages]
-
-                if len(target_page_numbers) == pdf_doc.page_count:
-                    # All pages - use original PDF
-                    subset_pdf_bytes = pdf_bytes
-                else:
-                    # Extract subset of pages
-                    subset_pdf = fitz.open()
-                    for page_num in sorted(target_page_numbers):
-                        subset_pdf.insert_pdf(pdf_doc, from_page=page_num - 1, to_page=page_num - 1)
-                    subset_pdf_bytes = subset_pdf.tobytes()
-                    subset_pdf.close()
-
-                pdf_doc.close()
-                page_images_for_extraction.append([])
-                page_numbers_for_extraction.append(target_page_numbers)
-                pdf_bytes_for_extraction.append(subset_pdf_bytes)
-            else:
-                # Use rendered images
-                all_images = [
-                    page_images_dict.get(page.page_number)
-                    for page in target_pages
-                    if page_images_dict.get(page.page_number)
-                ]
-                actual_page_numbers = [
-                    page.page_number
-                    for page in target_pages
-                    if page_images_dict.get(page.page_number)
-                ]
-                if all_images:
-                    page_images_for_extraction.append(all_images)
-                    page_numbers_for_extraction.append(actual_page_numbers)
-                    pdf_bytes_for_extraction.append(None)
-
-        # Add a check to ensure there are pages to process
-        if not page_images_for_extraction:
-            print("No pages found for VLM extraction, skipping.")
-            return outputs_by_page
-
-        # Run extraction for each set of images
-        structured_extraction_models = [
-            _make_gemini_call,
-            # _make_oai_call
-        ]
-
-        for images, page_numbers, pdf_bytes_chunk in zip(
-            page_images_for_extraction, page_numbers_for_extraction, pdf_bytes_for_extraction
-        ):
-            user_prompt = (
-                extraction_request.prompt
-                or "Extract information from this document according to the provided JSON schema."
-            )
-
-            try:
-                # Run the extraction using the model provider utils
-                result, input_tokens, output_tokens = await run_clients(
-                    user_prompt=user_prompt,
-                    images=images,
-                    models=structured_extraction_models,
-                    json_schema=json_schema,
-                    job_type="structured_extraction",
-                    pdf_bytes=pdf_bytes_chunk,
-                    # timeout=30,  # Use configured timeout from environment variables
-                )
-
-                # Track VLM structured extraction tokens
-                self.structured_extraction_input_tokens += input_tokens
-                self.structured_extraction_output_tokens += output_tokens
-                print(f"VLM Extraction tokens - Input: {input_tokens}, Output: {output_tokens}")
-
-                # Store results
-                if chunk_strategy == ChunkingStrategy.PAGE.value:
-                    # For page-level extraction, store result for single page
-                    outputs_by_page[page_numbers[0]] = result
-                else:  # Default to combined extraction (DOCUMENT, CLASS, or None)
-                    # For combined extraction, store result with a disambiguated key:
-                    # ((page1, page2, ...), chunk_idx=0) to avoid confusion with (page, chunk_idx)
-                    outputs_by_page[(tuple(page_numbers), 0)] = result
-
-            except Exception as e:
-                # Internal logging - detailed for debugging
-                print(f"Error during structured extraction: {e}")
-                # User-facing error - no internal details
-                raise RequestException(
-                    message="Data extraction failed. Please try again or contact Tensorlake support with the trace ID of the job."
-                )
-
-        return outputs_by_page
-
     def should_preserve_existing_pages(self) -> bool:
         """
         VLM tasks modify existing page layouts in place rather than creating new ones.
@@ -657,9 +512,6 @@ class VLMExtractionTask(BatchProcessor):
         if current_request.page_classification_request:
             await self._process_page_classification_batch(page_images_dict, batch_number)
 
-        # Process structured extraction for this batch if skip_ocr is enabled
-        await self._process_structured_extraction_batch(page_images_dict, batch_number)
-
         # Cleanup page images to free memory immediately
         for page_num, img in list(page_images_dict.items()):
             try:
@@ -734,8 +586,8 @@ class VLMExtractionTask(BatchProcessor):
         raw_results = []
         for result, input_tokens, output_tokens in results_with_tokens:
             raw_results.append(result)
-            self.structured_extraction_input_tokens += input_tokens
-            self.structured_extraction_output_tokens += output_tokens
+            self.page_classification_input_tokens += input_tokens
+            self.page_classification_output_tokens += output_tokens
 
         for page_layout, raw_result in zip(pages_for_classification, raw_results):
             page_class, reason, confidence = clean_page_classification_result(raw_result)
@@ -748,235 +600,6 @@ class VLMExtractionTask(BatchProcessor):
         print(
             f"Batch {batch_number} page classification time: {page_classification_end_time - page_classification_start_time:.2f} seconds"
         )
-
-    async def _process_structured_extraction_batch(self, page_images_dict, batch_number):
-        """Process structured extraction for a batch of pages if skip_ocr is enabled."""
-        structured_extraction_requests = skip_ocr_requests(self._current_parse_result.request)
-
-        if not structured_extraction_requests:
-            return
-
-        # Split requests by chunking strategy: run PAGE-chunked now with other page-independent tasks, defer None-chunked tasks
-        page_chunked_requests = []
-        none_chunked_requests = []
-        for extraction_request in structured_extraction_requests:
-            if extraction_request.chunking_strategy == ChunkingStrategy.PAGE.value:
-                page_chunked_requests.append(extraction_request)
-            else:
-                # Defer None-chunked requests until after all batches complete
-                none_chunked_requests.append(extraction_request)
-
-        if not page_chunked_requests:
-            # Nothing to do in this batch for structured extraction
-            return
-
-        print(
-            f"Running structured extraction for batch {batch_number}: {len(page_chunked_requests)} PAGE-chunked requests"
-        )
-
-        if not self._current_parse_result.structured_outputs_by_page:
-            self._current_parse_result.structured_outputs_by_page = {}
-
-        # Process only PAGE-chunked extraction requests for this batch
-        for extraction_request in page_chunked_requests:
-            print(f"Batch {batch_number}: Processing extraction request ")
-            # print(
-            #     f"Batch {batch_number}: Processing extraction request for schema: {extraction_request.schema_name}"
-            # )
-
-            # Filter pages for this batch that match the extraction criteria
-            pages_to_process = []
-            if extraction_request.page_classes:
-                # Filter pages in this batch that match the specified page classes
-                for page_num in page_images_dict.keys():
-                    # Find the corresponding page layout
-                    page_layout = None
-                    for layout in self._current_parse_result.document_layout.pages:
-                        if layout.page_number == page_num:
-                            page_layout = layout
-                            break
-
-                    if not page_layout:
-                        continue
-
-                    # Check if page matches extraction criteria
-                    if isinstance(page_layout.page_class, list):
-                        if any(
-                            page_class in extraction_request.page_classes
-                            for page_class in page_layout.page_class
-                        ):
-                            pages_to_process.append(page_layout)
-                    else:
-                        if page_layout.page_class in extraction_request.page_classes:
-                            pages_to_process.append(page_layout)
-            else:
-                # If no page_classes are specified, use all pages in this batch
-                pages_to_process = [
-                    page_layout
-                    for page_layout in self._current_parse_result.document_layout.pages
-                    if page_layout.page_number in page_images_dict
-                ]
-
-            if not pages_to_process:
-                print(f"Batch {batch_number}: No pages found")
-                continue
-
-            # Run extraction for this batch
-            # Pass PDF bytes if input is PDF for direct processing
-            pdf_bytes = None
-            if self._current_parse_result.request.mime_type == "application/pdf":
-                pdf_bytes = self._current_parse_result.request.file_bytes
-
-            outputs_by_page = await self._prepare_and_run_extraction(
-                extraction_request, pages_to_process, page_images_dict, pdf_bytes=pdf_bytes
-            )
-
-            # Store results
-            schema_name = extraction_request.schema_name
-            for page_key, result in outputs_by_page.items():
-                try:
-                    if isinstance(result, str):
-                        json_result = result
-                    else:
-                        json_result = json.dumps(result)
-                except Exception as e:
-                    raise RequestException(
-                        message=f"Error getting valid JSON from structured extraction: {e}"
-                    )
-
-                if page_key not in self._current_parse_result.structured_outputs_by_page:
-                    self._current_parse_result.structured_outputs_by_page[page_key] = {}
-                self._current_parse_result.structured_outputs_by_page[page_key][
-                    schema_name
-                ] = json_result
-
-    async def _run_deferred_structured_extraction(self, parse_result: ParseResult):
-        """
-        Run structured extraction for skip_ocr requests with None chunking AFTER all batches complete,
-        so page_class info across the whole document is available. To avoid OOM, we re-generate
-        the small set of page images (<=5) needed for extraction instead of storing them according to the page number subset.
-        """
-        structured_extraction_requests = skip_ocr_requests(parse_result.request)
-
-        if not structured_extraction_requests:
-            return
-
-        # Filter only None-chunked requests: treat anything not 'page' as none-chunked
-        none_chunked_requests = [
-            req
-            for req in structured_extraction_requests
-            if req.chunking_strategy != ChunkingStrategy.PAGE.value
-        ]
-
-        if not none_chunked_requests:
-            return
-
-        if not parse_result.structured_outputs_by_page:
-            parse_result.structured_outputs_by_page = {}
-
-        print(
-            f"\n=== Running deferred structured extraction for {len(none_chunked_requests)} None-chunked requests ==="
-        )
-
-        # Helper to regenerate images for a specific set of page numbers (keeps memory minimal)
-        def regenerate_images_for_pages(target_page_numbers):
-            # Use SimplePageCreator's pages_to_parse to regenerate only needed pages
-            original_pages_to_parse = getattr(parse_result.request, "pages_to_parse", None)
-            try:
-                parse_result.request.pages_to_parse = list(sorted(set(target_page_numbers)))
-                regenerated = {}
-                for page_batch in self.page_creator.get_images_generator(parse_result):
-                    # Because pages_to_parse is limited (<=5), a single yield should cover it
-                    for pn, im in page_batch.page_images.items():
-                        regenerated[pn] = im
-                    break
-                return regenerated
-            finally:
-                # Restore original pages_to_parse to avoid side effects
-                parse_result.request.pages_to_parse = original_pages_to_parse
-
-        # Process each deferred request
-        for extraction_request in none_chunked_requests:
-            print(f"Deferred SE: Processing schema {extraction_request.schema_name}")
-
-            # Build page_class -> [pages] map across entire document
-            page_class_to_pages = {}
-            if extraction_request.page_classes:
-                for page_layout in parse_result.document_layout.pages:
-                    classes = page_layout.page_class
-                    if isinstance(classes, list):
-                        for cls_name in classes:
-                            if cls_name in extraction_request.page_classes:
-                                page_class_to_pages.setdefault(cls_name, []).append(page_layout)
-                    else:
-                        if classes in extraction_request.page_classes:
-                            page_class_to_pages.setdefault(classes, []).append(page_layout)
-            else:
-                # No page_classes: all pages in one bucket
-                page_class_to_pages["__all__"] = parse_result.document_layout.pages
-
-            # Iterate per class bucket
-            for cls_name, pages in page_class_to_pages.items():
-                if not pages:
-                    continue
-                if cls_name != "__all__" and len(pages) > 5:
-                    # print(f"Warning: Skipping page class '{cls_name}' with {len(pages)} pages (>5) for None-chunk SE")
-                    print(
-                        f"Warning: Skipping extraction with {len(pages)} pages (>5) for None-chunk SE"
-                    )
-                    continue
-                if cls_name == "__all__" and len(pages) > 5:
-                    # For no page_classes case, enforce <=5 here (early error was handled earlier, but keep guard)
-                    print(
-                        f"Warning: Skipping None-chunk SE for all pages because page count is {len(pages)} (>5)"
-                    )
-                    continue
-
-                # Run extraction with None chunking across the selected pages in this class bucket
-                # For PDFs, use direct PDF processing without regenerating images
-                target_page_numbers = [pl.page_number for pl in pages]
-
-                if parse_result.request.mime_type == "application/pdf":
-                    # Use PDF directly - no need to regenerate images
-                    pdf_bytes = parse_result.request.file_bytes
-                    page_images_dict = {}  # Empty dict since we're using PDF
-                else:
-                    # For non-PDF, regenerate images as before
-                    pdf_bytes = None
-                    regenerated_images = regenerate_images_for_pages(target_page_numbers)
-                    page_images_dict = {
-                        pn: regenerated_images.get(pn)
-                        for pn in target_page_numbers
-                        if regenerated_images.get(pn) is not None
-                    }
-
-                    if not page_images_dict:
-                        print("Deferred SE: No images regenerated for selected pages")
-                        continue
-
-                outputs_by_page = await self._prepare_and_run_extraction(
-                    extraction_request,
-                    pages,
-                    page_images_dict,
-                    pdf_bytes=pdf_bytes,
-                )
-
-            # Store results
-            schema_name = extraction_request.schema_name
-            for page_key, result in outputs_by_page.items():
-                try:
-                    if isinstance(result, str):
-                        json_result = result
-                    else:
-                        json_result = json.dumps(result)
-                except Exception as e:
-                    raise RequestException(
-                        message=f"Error getting valid JSON from structured extraction: {e}"
-                    )
-
-                if page_key not in parse_result.structured_outputs_by_page:
-                    parse_result.structured_outputs_by_page[page_key] = {}
-                parse_result.structured_outputs_by_page[page_key][schema_name] = json_result
 
     @function(
         image=vlm_extraction_image,
@@ -994,8 +617,8 @@ class VLMExtractionTask(BatchProcessor):
         # Initialize token tracking at the start of each run
         self.summarization_input_tokens = 0
         self.summarization_output_tokens = 0
-        self.structured_extraction_input_tokens = 0
-        self.structured_extraction_output_tokens = 0
+        self.page_classification_input_tokens = 0
+        self.page_classification_output_tokens = 0
         self.chart_extraction_input_tokens = 0
         self.chart_extraction_output_tokens = 0
         self.table_extraction_input_tokens = 0
@@ -1005,10 +628,7 @@ class VLMExtractionTask(BatchProcessor):
         self.figure_grounding_input_tokens = 0
         self.figure_grounding_output_tokens = 0
 
-        # Determine if any task requires page images based on skip_ocr flag and vlm related tasks
-        skip_ocr_reqs = skip_ocr_requests(parse_result.request)
-        skip_ocr = bool(skip_ocr_reqs)
-
+        # Determine if any VLM task requires page images.
         needs_images = (
             parse_result.request.table_summarization
             or parse_result.request.figure_summarization
@@ -1017,7 +637,6 @@ class VLMExtractionTask(BatchProcessor):
             or parse_result.request.key_value_extraction
             or parse_result.request.figure_grounding
             or parse_result.request.page_classification_request
-            or skip_ocr
         )
 
         if needs_images:
@@ -1026,44 +645,6 @@ class VLMExtractionTask(BatchProcessor):
             # Store current parse result for batch processing methods to access
             self._current_parse_result = parse_result
 
-            # Initialize page layouts for skip_ocr case before batch processing
-            if skip_ocr and not parse_result.document_layout.pages:
-                print("🔧 Creating page layouts for VLM task since skip_ocr=True...")
-                from tensorlake_docai.models.layout_objects import PageLayout
-
-                # Create basic page layouts for each page using existing total_pages
-                total_pages = parse_result.document_layout.total_pages
-                for page_num in range(1, total_pages + 1):
-                    page_layout = PageLayout(
-                        page_number=page_num,
-                        elements=[],  # No OCR elements, VLM will work directly with images
-                        shape=(1, 1),  # Will be updated during batch processing
-                        page_dimensions={"width": 1, "height": 1},
-                    )
-                    parse_result.document_layout.pages.append(page_layout)
-
-                print(
-                    f"✅ Created {len(parse_result.document_layout.pages)} page layouts for skip_ocr."
-                )
-
-            # Validation for structured extraction with skip_ocr when chunking is None
-            if skip_ocr:
-                # Check if any skip_ocr request has None chunking
-                for extraction_request in skip_ocr_reqs:
-                    # If chunking is None:
-                    # - If page_classes specified: handle per-class later (no early error here)
-                    # - If no page_classes: enforce global <=5 pages rule early
-                    if (
-                        not extraction_request.chunking_strategy
-                        and not extraction_request.page_classes
-                    ):
-                        if parse_result.document_layout.total_pages > 5:
-                            raise RequestException(
-                                message=f"Structured extraction with skip_ocr=True and no chunking strategy is only supported for documents with 5 or fewer pages. "
-                                f"This document has {parse_result.document_layout.total_pages} pages. "
-                                f"Please specify a chunking_strategy (e.g., 'page') to process this document."
-                            )
-
             # Run batch processing - this will process each batch through process_batch method
             ctx: RequestContext = RequestContext.get()
             image_dimensions = ImageDimensions(target_dpi=200, upgrade_image_dpi=False)
@@ -1071,16 +652,11 @@ class VLMExtractionTask(BatchProcessor):
 
             print("✅ Completed VLM batch processing")
 
-            # After all batches, run deferred structured extraction (None chunking) once,
-            # so page_class from all pages is available.
-            if skip_ocr:
-                asyncio.run(self._run_deferred_structured_extraction(parse_result))
-
             # Clean up current parse result reference
             if hasattr(self, "_current_parse_result"):
                 delattr(self, "_current_parse_result")
 
-        # Update usage with both summarization and structured extraction token information
+        # Update usage with VLM token information.
         if parse_result.usage:
             # Set summarization token usage (summarization only happens here)
             parse_result.usage.summarization_input_tokens_used = (
@@ -1089,6 +665,7 @@ class VLMExtractionTask(BatchProcessor):
                 + self.form_extraction_input_tokens
                 + self.table_extraction_input_tokens
                 + self.figure_grounding_input_tokens
+                + self.page_classification_input_tokens
             )
             parse_result.usage.summarization_output_tokens_used = (
                 self.summarization_output_tokens
@@ -1096,48 +673,30 @@ class VLMExtractionTask(BatchProcessor):
                 + self.form_extraction_output_tokens
                 + self.table_extraction_output_tokens
                 + self.figure_grounding_output_tokens
-            )
-
-            # Set structured extraction token usage (structured extraction starts here)
-            parse_result.usage.extraction_input_tokens_used = (
-                self.structured_extraction_input_tokens
-            )
-            parse_result.usage.extraction_output_tokens_used = (
-                self.structured_extraction_output_tokens
+                + self.page_classification_output_tokens
             )
         else:
-            # Create new usage object with both token types
+            # Create new usage object with VLM token counts.
             from tensorlake_docai.pipeline.api import Usage
 
             parse_result.usage = Usage(
                 pages_parsed=0,  # Will be set by other workflow components
-                extraction_input_tokens_used=self.structured_extraction_input_tokens,
-                extraction_output_tokens_used=self.structured_extraction_output_tokens,
                 summarization_input_tokens_used=self.summarization_input_tokens
                 + self.chart_extraction_input_tokens
                 + self.form_extraction_input_tokens
                 + self.table_extraction_input_tokens
-                + self.figure_grounding_input_tokens,
+                + self.figure_grounding_input_tokens
+                + self.page_classification_input_tokens,
                 summarization_output_tokens_used=self.summarization_output_tokens
                 + self.chart_extraction_output_tokens
                 + self.form_extraction_output_tokens
                 + self.table_extraction_output_tokens
-                + self.figure_grounding_output_tokens,
+                + self.figure_grounding_output_tokens
+                + self.page_classification_output_tokens,
             )
 
         print(
             f"Total summarization tokens used - Input: {self.summarization_input_tokens}, Output: {self.summarization_output_tokens}"
         )
-        print(
-            f"Total structured extraction tokens used - Input: {self.structured_extraction_input_tokens}, Output: {self.structured_extraction_output_tokens}"
-        )
-
-        # Node-by-node routing decisions
-        if vlm_extraction_should_go_to_structured_extraction(parse_result.request):
-            print("🔀 VLM_EXTRACTION → StructuredExtraction")
-            return StructuredExtraction().run.future(parse_result)
-
-        else:
-            # Default fallback
-            print("🔀 VLM_EXTRACTION → OutputFormatter (default fallback)")
-            return format_final_output(parse_result)
+        print("🔀 VLM_EXTRACTION → OutputFormatter")
+        return format_final_output(parse_result)

@@ -137,7 +137,7 @@ async def _process_single_element(
                 user_prompt=user_prompt,
                 images=[image],
                 models=[_make_gemini_call],
-                job_type="structured_extraction",
+                job_type="json_schema",
                 json_schema=json_schema,
             )
             input_tokens += in_tok
@@ -184,7 +184,7 @@ async def _process_single_element(
                 user_prompt=user_prompt,
                 images=[image],
                 models=[_make_gemini_call],
-                job_type="structured_extraction",
+                job_type="json_schema",
                 json_schema=extraction_schema,
             )
             input_tokens += in_tok

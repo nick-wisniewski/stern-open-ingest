@@ -4,8 +4,8 @@ We run this pipeline **ourselves** via the `--local` runner — each task execut
 in our own process/container, not on Tensorlake's hosted orchestration. See
 [`CLAUDE.md`](../CLAUDE.md) for how this fork is deployed and what we don't use.
 
-The `ParseRequest` object is the single API surface. `examples/parse_pdf.py` and
-`examples/extract_structured.py` build one and run it locally.
+The `ParseRequest` object is the single API surface. `examples/parse_pdf.py`
+builds one and runs it locally.
 
 ---
 
@@ -59,7 +59,7 @@ set -a; source .env; set +a
 | Feature | Required env vars |
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
-| VLM enrichment + structured extraction | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
+| VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
 | Table merging / page classification | `GEMINI_API_KEY` (default provider) or another LLM key |
 | `s3://` file inputs | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` (bare-key form only) |
 
@@ -84,8 +84,8 @@ false, so misconfigurations fail fast.
 and [AIDC-AI/Ovis2.5-9B](https://huggingface.co/AIDC-AI/Ovis2.5-9B) are pulled
 from Hugging Face Hub on first cold-start (~25 GB).
 
-Skip this section if you are only iterating on non-OCR stages (structured extraction
-with `skip_ocr=True`, output formatting, etc.).
+Skip this section if you are only iterating on non-OCR stages (output formatting,
+docs, routing predicates, etc.).
 
 ---
 
@@ -140,49 +140,6 @@ python examples/parse_pdf.py --file my.pdf --local \
 | `--key-value-extraction` | `key_value_extraction` | Form-region KV pairs |
 | `--detect-barcode` | `detect_barcode` | |
 | `--xpage-header-detection` | `xpage_header_detection` | Remove repeating headers/footers |
-
-### OCR + structured extraction
-
-```bash
-python examples/extract_structured.py \
-    --file invoice.pdf \
-    --schema Invoice \
-    --ocr-model dots-ocr \
-    --model-provider openai \
-    --chunk-strategy page \
-    --enable-citation \
-    --local
-```
-
-**Bringing your own schema.** Define a Pydantic `BaseModel` in your own code and
-pass its JSON schema to `StructuredExtractionRequest` — no edits inside the
-`tensorlake_docai` package needed:
-
-```python
-import json
-from pydantic import BaseModel, Field
-from tensorlake_docai.pipeline.api import ParseRequest, StructuredExtractionRequest
-
-class MyReceipt(BaseModel):
-    store: str | None = Field(None, description="Store name")
-    receipt_date: str | None = Field(None, description="Date on the receipt")
-    total: float | None = Field(None, description="Grand total")
-
-se_req = StructuredExtractionRequest(
-    json_schema=json.dumps(MyReceipt.model_json_schema()),
-    schema_name="MyReceipt",
-    model_provider="openai",          # or "anthropic" | "gemini"
-)
-req = ParseRequest(file_url="s3://...", structured_extraction_requests=[se_req])
-```
-
-`examples/extract_structured.py` shows the same wiring end-to-end. It defines
-`Invoice` and `Customer` locally and imports `BankStatement` and `Receipt` from
-`tensorlake_docai.extraction.schema_collections`. Add a class to
-`SCHEMA_REGISTRY` in that file so `--schema YourName` can find it.
-
-`--skip-ocr` routes straight from `FILE_CONVERTOR → VLMExtractionTask`, skipping
-OCR entirely. Useful for screenshots and forms with poor OCR signal.
 
 ### Page classification
 
@@ -255,13 +212,11 @@ Both examples produce a `ParsedDocument` (`pipeline/api.py`):
 |---|---|
 | `pages[]` | Every page with `page_fragments[]` (text/table/figure/chart/...), bounding boxes, `ref_id`s |
 | `chunks[]` | Flattened content per `chunk_strategy` |
-| `structured_data` | Schema-extracted JSON |
 | `page_classes[]` | Classification results |
 | `merged_tables[]` | Cross-page table stitching |
-| `usage` | Token counts per stage (OCR / VLM / extraction / header correction) |
+| `usage` | Token counts per stage (OCR / VLM / form filling / header correction) |
 
 `parse_pdf.py` writes `./debug/document.json` plus one markdown file per chunk.
-`extract_structured.py` prints `structured_data` to stdout.
 
 ---
 

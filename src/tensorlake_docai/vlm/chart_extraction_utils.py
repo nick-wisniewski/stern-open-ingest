@@ -108,7 +108,7 @@ async def run_element_chart_extraction_and_modify_page_elements(
                     images=[cropped_image],
                     page_image=None,
                     models=[_make_gemini_call_charts],
-                    job_type="structured_extraction",
+                    job_type="json_schema",
                     json_schema=detection_schema,
                 )
             )
@@ -184,7 +184,7 @@ async def run_element_chart_extraction_and_modify_page_elements(
                     images=[chart_img],
                     page_image=None,
                     models=[_make_gemini_call_charts],
-                    job_type="structured_extraction",
+                    job_type="json_schema",
                     json_schema=None,
                 )
             )
@@ -203,7 +203,7 @@ async def run_element_chart_extraction_and_modify_page_elements(
                         images=[table_img],
                         page_image=None,
                         models=[_make_gemini_call_charts],
-                        job_type="structured_extraction",
+                        job_type="json_schema",
                         json_schema=None,
                     )
                 )

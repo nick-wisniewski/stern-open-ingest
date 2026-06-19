@@ -5,9 +5,8 @@ run ourselves. The cloud backends from upstream (Azure Document Intelligence,
 AWS Textract, Google Gemini) have been removed. Select the backend via
 `ocr_model` on the `ParseRequest` (it defaults to `dots-ocr`).
 
-> Gemini is still available as an LLM/VLM **provider** (e.g. for table merging,
-> page classification, and structured extraction) — it is just no longer an OCR
-> backend.
+> Gemini is still available as an LLM/VLM **provider** (e.g. for table merging
+> and page classification) — it is just no longer an OCR backend.
 
 ## `dots-ocr`
 

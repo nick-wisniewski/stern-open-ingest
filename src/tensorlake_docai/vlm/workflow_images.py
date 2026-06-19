@@ -21,17 +21,6 @@ table_merging_image = (
     .run("pip cache purge")
 )
 
-structured_extraction_image = (
-    Image(base_image="python:3.12-slim", name="documentai/structured-extraction")
-    .run("python -m pip install --upgrade pip wheel setuptools")
-    .run("pip install openai anthropic==0.74.1 google-genai==1.51.0")
-    .run(f"pip install '{PYDANTIC_PIN}' markdownify")  # Data validation + markdown output
-    .run("pip install requests boto3")  # File download + S3 access
-    .run("pip install tiktoken==0.11.0 beautifulsoup4==4.13.4")
-    .run("pip install pillow")  # imported by providers.model_provider_utils
-    .run("pip cache purge")
-)
-
 vlm_extraction_image = (
     Image(base_image="python:3.12-slim", name="documentai/vlm-extraction")
     .run("apt-get update && apt-get install -y libxcb1 && rm -rf /var/lib/apt/lists/*")

@@ -32,6 +32,5 @@ def test_pipeline_modules_importable():
         "tensorlake_docai.models.layout_objects",
         "tensorlake_docai.tables.table_merging",
         "tensorlake_docai.vlm.cloud",
-        "tensorlake_docai.extraction.structured_extraction_functions",
     ):
         importlib.import_module(mod)

@@ -284,7 +284,7 @@ async def run_table_correction_process(
             user_prompt=prompt,
             images=[image],
             models=[_make_gemini_call],
-            job_type="structured_extraction",
+            job_type="json_schema",
             json_schema=json_schema,
         )
 

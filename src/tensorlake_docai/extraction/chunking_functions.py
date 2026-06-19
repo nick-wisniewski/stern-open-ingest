@@ -7,7 +7,6 @@ from tensorlake_docai.pipeline.api import (
     Chunk,
     ParseRequest,
     Page,
-    StructuredExtractionRequest,
     PageClass,
 )
 from tensorlake_docai.postprocess.formatter import (
@@ -53,9 +52,7 @@ def chunk_document(result: ParseResult) -> ParsedDocument:
     elif result.request.chunk_strategy == ChunkingStrategy.PAGE.value:
         chunks = page_chunking(pages, result.request)
     elif result.request.chunk_strategy == ChunkingStrategy.PATTERNS.value:
-        # Patterns chunking in chunk_document is not supported since patterns are not available
-        # This should only be used in structured extraction flow via chunk_pages
-        raise RequestException("Patterns chunking is only supported in structured extraction flow")
+        raise RequestException("Patterns chunking is not supported")
     else:
         chunk = document_to_markdown(pages, result.request)
         chunks = [Chunk(content=chunk, page_number=0)]
@@ -142,7 +139,7 @@ def chunk_pages(
     return chunks
 
 
-def page_chunking(pages: List[Page], request: StructuredExtractionRequest) -> List[Chunk]:
+def page_chunking(pages: List[Page], request: ParseRequest) -> List[Chunk]:
     page_chunks = []
     for page in pages:
         # Track all element ref_ids for this page for citation filtering

@@ -14,7 +14,6 @@ class FormFillingResult(BaseModel):
 class ParseResult(BaseModel):
     document_layout: Optional[DocumentLayout] = None
     form_filling_result: Optional[FormFillingResult] = None
-    structured_outputs_by_page: Optional[Dict[int, Any]] = None
     request: ParseRequest
     usage: Optional[Usage] = None
 

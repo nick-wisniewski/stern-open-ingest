@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "tensorlake-docai"
 version = "0.1.0"
-description = "Open Ingest: open-source document ingestion pipeline — OCR, layout, VLM enrichment, and structured extraction. Runs as a Tensorlake workflow."
+description = "Open Ingest: open-source document ingestion pipeline for OCR, layout, and VLM enrichment. Runs as a Tensorlake workflow."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Tensorlake", email = "hello@tensorlake.ai" }]
-keywords = ["openingest", "ocr", "vlm", "pdf", "tensorlake", "structured-extraction"]
+keywords = ["openingest", "ocr", "vlm", "pdf", "tensorlake"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -44,9 +44,6 @@ dependencies = [
     "jdeskew==0.3.0",
     # Validation / parsing
     "pydantic",
-    "tiktoken==0.11.0",
-    "beautifulsoup4==4.13.4",
-    "lxml==6.1.0",
     # File handling
     "python-magic==0.4.27",
     # Utilities

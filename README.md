@@ -8,13 +8,11 @@ It runs as a **standalone provider service**. Our Rails app (`stern-liability`)
 submits a parse request and gets the result back over HTTP (webhook or poll).
 The two systems are independent and talk only over HTTP.
 
-> **Read [`CLAUDE.md`](CLAUDE.md) first.** It is the source of truth for how this
-> fork is run, what we deliberately don't use (Tensorlake-hosted deployment,
-> `tl deploy`, Azure, Textract), and the current OCR-backend direction.
+> We deliberately don't use Tensorlake-hosted deployment.
 
 ---
 
-## How we run it
+## How it runs
 
 We run the pipeline **ourselves** with the `--local` runner — each task executes
 in our own process/container. We do **not** use Tensorlake's hosted
@@ -94,7 +92,7 @@ Only the features you use need keys:
 | Feature | Keys |
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
-| VLM enrichment + structured extraction | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
+| VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
 | `s3://` file inputs | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` |
 
 Missing keys silently disable the dependent feature; the rest of the pipeline
@@ -109,15 +107,8 @@ python examples/parse_pdf.py --file my.pdf --ocr-model dots-ocr --local
 Results land in `./debug/` (`document.json` plus one markdown file per chunk).
 Add `--draw-bboxes` to also write per-page PNGs with fragment bounding boxes.
 
-Structured extraction:
-
-```bash
-python examples/extract_structured.py --file invoice.pdf --schema Invoice --local
-```
-
 Full walkthrough — every `ParseRequest` flag, VLM enrichment, page
-classification, structured extraction, and file inputs — is in
-[`docs/running.md`](docs/running.md).
+classification, and file input mode — is in [`docs/running.md`](docs/running.md).
 
 ---
 
@@ -146,19 +137,13 @@ register it with the runner.
 - **Bring your own OCR backend.** Drop a file in `src/tensorlake_docai/ocr/`,
   register it in `ocr/__init__.py`, widen the `ocr_model` enum in
   `pipeline/api.py`, and import it in `workflow.py`. Calling `route_after_ocr`
-  at the end of your task wires it into table merging, structured extraction,
-  VLM enrichment, and the unified output format. Step-by-step:
+  at the end of your task wires it into table merging, VLM enrichment, and the
+  unified output format. Step-by-step:
   [`src/tensorlake_docai/ocr/README.md`](src/tensorlake_docai/ocr/README.md).
   This is the path we'll use to add a lighter OCR backend (see `CLAUDE.md`).
 - **Add a VLM enrichment pass.** Table/figure summarization, chart extraction,
   and key-value extraction live in `src/tensorlake_docai/vlm/cloud.py` as batched
   passes over the document — add another by following the same shape.
-- **Drop in your own structured-extraction schema.** Define a Pydantic
-  `BaseModel` and pass `json.dumps(YourModel.model_json_schema())` to
-  `StructuredExtractionRequest`. See `examples/extract_structured.py` and
-  [`docs/running.md`](docs/running.md). A few sample schemas (`Invoice`,
-  `Customer`, `BankStatement`, `Receipt`) ship in
-  `tensorlake_docai.extraction.schema_collections`.
 
 The `dots-ocr` backend doubles as the reference implementation for serving a GPU
 model: vLLM engine setup, model caching, two-stage classification → extraction,
@@ -171,14 +156,14 @@ and masked-region retries live in `src/tensorlake_docai/ocr/dots_ocr.py` and
 
 ```
 stern-open-ingest/
-├── examples/                    # parse_pdf.py, extract_structured.py
+├── examples/                    # parse_pdf.py
 ├── src/
 │   ├── workflow.py              # imports every task to register it
 │   └── tensorlake_docai/
 │       ├── pipeline/            # file_converter, routing, output_formatter, api
 │       ├── ocr/                 # dots_ocr, figure_ocr (BYO-OCR registry)
 │       ├── vlm/                 # VLM summarization, grounding, chart extraction
-│       ├── extraction/          # structured extraction + chunking + schemas
+│       ├── extraction/          # form filling + output chunking helpers
 │       ├── tables/              # cross-page merging, cell grounding, correction
 │       ├── postprocess/         # header correction, formatter, output cleaner
 │       ├── models/              # ParseResult, PageLayout, etc.

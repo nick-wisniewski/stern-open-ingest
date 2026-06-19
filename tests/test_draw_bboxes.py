@@ -1,15 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-"""Tests for draw_bboxes pure helpers — page-image selection, citation
-detection, and the bbox drawing routine. The PDF/image loading and PIL save
-paths are covered by integration; this file focuses on the deterministic
-logic that wraps them.
+"""Tests for draw_bboxes pure helpers.
+
+The PDF/image loading and PIL save paths are covered by integration; this file
+focuses on deterministic page-image selection and bbox drawing.
 """
 
 import pytest
 from PIL import Image
 
 from tensorlake_docai.postprocess.draw_bboxes import (
-    _has_citations,
     _select_page_image,
     draw_bboxes_on_image,
 )
@@ -57,33 +56,6 @@ def test_select_page_image_copy_returns_independent_image():
     out = _select_page_image(images, page, copy_image=True)
     assert out is not images[0]
     assert out.size == images[0].size
-
-
-# --- _has_citations --------------------------------------------------------
-
-
-def test_has_citations_detects_top_level_citation_key():
-    assert _has_citations({"name_citation": {"x1": 1}}) is True
-
-
-def test_has_citations_detects_nested_citation_key():
-    data = {"outer": {"inner": {"field_citation": {"x1": 1}}}}
-    assert _has_citations(data) is True
-
-
-def test_has_citations_detects_in_list_items():
-    data = {"items": [{"a": 1}, {"b_citation": "ref"}]}
-    assert _has_citations(data) is True
-
-
-def test_has_citations_returns_false_without_citation_suffix():
-    assert _has_citations({"name": "x", "age": 5}) is False
-
-
-def test_has_citations_non_dict_input():
-    assert _has_citations("not a dict") is False
-    assert _has_citations(None) is False
-    assert _has_citations([1, 2, 3]) is False
 
 
 # --- draw_bboxes_on_image -------------------------------------------------

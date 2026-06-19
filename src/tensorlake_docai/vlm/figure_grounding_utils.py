@@ -90,7 +90,7 @@ async def run_element_figure_grounding_and_modify_page_elements(
                     user_prompt=prompt,
                     images=[cropped_image],
                     models=[_make_gemini_call_fast],
-                    job_type="structured_extraction",
+                    job_type="json_schema",
                     json_schema=GROUNDING_SCHEMA,
                     timeout=600,
                 )

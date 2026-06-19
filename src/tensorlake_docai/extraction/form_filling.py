@@ -606,7 +606,7 @@ class FormDetector:
                         timeout=360,
                         images=[img],
                         model_name=self.gemini_model_name,
-                        job_type="structured_extraction",
+                        job_type="json_schema",
                         config_overrides=config_overrides,
                         json_schema=json.dumps(detection_schema),
                     )
@@ -709,7 +709,7 @@ class FormFiller:
                     images=[],
                     model_name=self.model_name,
                     system_instruction=system_prompt,
-                    job_type="structured_extraction",
+                    job_type="json_schema",
                     config_overrides={"temperature": 0.0},
                     # json_schema=json.dumps(filling_schema),
                 )
@@ -872,7 +872,7 @@ class MetadataRefiner:
                         user_prompt=user_prompt,
                         images=[draw_img],
                         model_name=self.model_name,
-                        job_type="structured_extraction",
+                        job_type="json_schema",
                         config_overrides=config_overrides,
                         json_schema=json.dumps(analyzer_schema),
                     )
