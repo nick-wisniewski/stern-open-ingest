@@ -35,11 +35,7 @@ from tensorlake_docai.pipeline.routing import (
 )
 from tensorlake_docai.tables.table_correction import TableGridParser
 
-SECRETS = [
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_REGION",
-]
+SECRETS = []
 
 TABLE_MERGING_SCHEMAS = {
     "merged_summary": json.dumps(

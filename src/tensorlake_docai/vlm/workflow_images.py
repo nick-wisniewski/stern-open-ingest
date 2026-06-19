@@ -13,7 +13,7 @@ table_merging_image = (
     .run("apt-get update && apt-get install -y tesseract-ocr && rm -rf /var/lib/apt/lists/*")
     .run("python -m pip install --upgrade pip wheel setuptools")
     .run("pip install google-genai==1.51.0")
-    .run("pip install requests boto3")  # File download + S3 access
+    .run("pip install requests")  # Presigned URL download
     .run("pip install pymupdf psutil markdownify")
     .run(f"pip install '{PYDANTIC_PIN}'")  # Data models
     .run("pip install pillow numpy jdeskew")
@@ -30,7 +30,7 @@ vlm_extraction_image = (
     .run("pip install opencv-python-headless")  # Headless OpenCV for jdeskew
     .run("pip install jdeskew==0.3.0 --no-deps")
     .run(f"pip install '{PYDANTIC_PIN}'")  # Data validation
-    .run("pip install boto3 requests markdownify")  # S3 + HTTP file download
+    .run("pip install requests markdownify")  # Presigned URL download
     .run("pip install openai==2.3.0 google-genai==1.51.0")
     .run("pip cache purge")
 )
@@ -47,7 +47,7 @@ ocr_gpu_cuda_image = (
         f"pip install '{PYDANTIC_PIN}'"
     )  # enforce exact version after vllm's transitive resolution
     .run("pip install pyzbar")
-    .run("pip install s3fs boto3 cryptography==46.0.5")
+    .run("pip install cryptography==46.0.5")
     .run("pip install qwen-vl-utils")
     .run("pip install markdownify zxing==1.0.3")
     .run("pip install pillow numpy")
@@ -65,7 +65,7 @@ file_convertion_image = (
     .run("apt-get update && apt-get install -y libmagic1 && rm -rf /var/lib/apt/lists/*")
     .run("python -m pip install --upgrade pip wheel setuptools")
     .run("pip install python-magic==0.4.27")
-    .run("pip install requests boto3")
+    .run("pip install requests")
     .run(f"pip install '{PYDANTIC_PIN}'")
     .run("pip install pillow-heif pypdf")
     .run("pip cache purge")
@@ -82,7 +82,7 @@ simple_page_creator_image = (
     )  # Headless OpenCV for jdeskew (used by simple_page_creator)
     .run("pip install jdeskew==0.3.0 --no-deps")
     .run(f"pip install '{PYDANTIC_PIN}' markdownify")  # Data validation
-    .run("pip install boto3 requests")  # S3 + HTTP file download
+    .run("pip install requests")  # Presigned URL download
     .run("pip install openai google-genai==1.51.0")
     .run("pip cache purge")
 )

@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from tensorlake_docai.pipeline.api import ParseRequest
+from tensorlake_docai.pipeline.routing import _download_file
 
 
 def test_minimal_request_with_bytes():
@@ -17,9 +18,14 @@ def test_minimal_request_with_url():
     req = ParseRequest(
         file_name="x.pdf",
         mime_type="application/pdf",
-        file_url="s3://bucket/key",
+        file_url="https://bucket.s3.amazonaws.com/key?X-Amz-Signature=abc",
     )
     assert req.file_bytes is None
+
+
+def test_direct_s3_url_download_rejected():
+    with pytest.raises(Exception, match="HTTPS presigned URL"):
+        _download_file("s3://bucket/key")
 
 
 def test_unknown_ocr_model_rejected():

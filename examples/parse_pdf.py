@@ -61,7 +61,7 @@ def _parse_class_pair(raw: str) -> PageClassDefinition:
 def build_request(args: argparse.Namespace) -> ParseRequest:
     path = args.file
 
-    if path.startswith("s3://") or path.startswith("http"):
+    if path.startswith("https://"):
         file_bytes = None
         file_url = path
         file_name = Path(path).name
@@ -114,7 +114,7 @@ def main() -> None:
     )
 
     core = parser.add_argument_group("core")
-    core.add_argument("--file", required=True, help="Local path, s3:// URL, or https:// URL")
+    core.add_argument("--file", required=True, help="Local path or presigned HTTPS URL")
     core.add_argument(
         "--ocr-model",
         default="dots-ocr",

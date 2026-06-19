@@ -61,7 +61,6 @@ set -a; source .env; set +a
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
 | VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
 | Table merging / page classification | `GEMINI_API_KEY` (default provider) or another LLM key |
-| `s3://` file inputs | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` (bare-key form only) |
 
 Missing keys silently disable the dependent feature — the rest of the pipeline
 keeps running.
@@ -175,11 +174,11 @@ python examples/parse_pdf.py --file my.pdf --local \
 | Field | Use it when… | Value |
 |---|---|---|
 | `file_bytes` | the file lives on local disk | base64-encoded raw bytes (string) |
-| `file_url` | the file is in S3 or reachable over HTTP(S) | `"s3://my-bucket/key.pdf"` or `"https://example.com/inv.pdf"` |
+| `file_url` | Rails has generated a presigned S3 URL | `"https://my-bucket.s3.amazonaws.com/key.pdf?...signature..."` |
 
-`file_name` and `mime_type` are required in both cases. `s3://` URLs work either
-as `s3://my-bucket/key.pdf` (bucket in URL) or `s3://key.pdf` (bare key, needs
-`S3_BUCKET_NAME`).
+`file_name` and `mime_type` are required in both cases. Direct `s3://` URLs are
+not accepted; Rails should send a presigned HTTPS URL when the document lives in
+S3.
 
 ---
 

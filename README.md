@@ -93,7 +93,6 @@ Only the features you use need keys:
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
 | VLM enrichment | one of `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` |
-| `s3://` file inputs | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET_NAME` |
 
 Missing keys silently disable the dependent feature; the rest of the pipeline
 keeps running.

@@ -27,12 +27,6 @@ from tensorlake_docai.pipeline.routing import (
 from tensorlake_docai.models.intermediate_objects import ParseResult
 from tensorlake_docai.models.layout_objects import DocumentLayout
 
-SECRETS = [
-    "AWS_ACCESS_KEY_ID",
-    "AWS_SECRET_ACCESS_KEY",
-    "AWS_REGION",
-]
-
 _EXTENSION_TO_MIME = {
     ".pdf": "application/pdf",
     ".png": "image/png",
@@ -187,7 +181,6 @@ def process_file_from_s3_or_url(request: ParseRequest) -> None:
 @function(
     description="Validate and normalize PDF/image inputs for the parsing pipeline.",
     image=file_convertion_image,
-    secrets=SECRETS,
     timeout=30 * 60,
     cpu=2,
     memory=5,

@@ -6,12 +6,10 @@ Module with utility functions to use by workflow steps.
 import asyncio
 import base64
 import json
-import os
 import re
 import time
 from typing import List, Optional, Tuple
 
-import boto3
 import requests
 from tensorlake_docai.pipeline.api import PageFragmentType, ParseRequest
 from tensorlake_docai.models.intermediate_objects import FileData, ParseResult
@@ -289,25 +287,9 @@ def download_file(request: ParseRequest) -> FileData:
 
 
 def _download_file(file_url: str) -> Tuple[bytes, str]:
-    if file_url.startswith("s3://"):
-        s3_client, bucket_name = _create_s3_client()
-        key = file_url[len("s3://") :]
-        # Allow either "s3://<key>" (uses S3_BUCKET_NAME) or "s3://<bucket>/<key>"
-        if "/" in key and bucket_name is None:
-            bucket_name, key = key.split("/", 1)
-        try:
-            response = s3_client.get_object(Bucket=bucket_name, Key=key)
-        except Exception as e:
-            print(f"error getting file from S3. {e}")
-            raise RequestException(message="error getting file from S3.") from e
-
-        content = response["Body"].read()
-        content_type = response["ResponseMetadata"]["HTTPHeaders"]["content-type"]
-        return content, content_type
-
     if file_url.startswith("https://"):
         try:
-            response = requests.get(file_url, timeout=(5, 5))
+            response = requests.get(file_url, timeout=(5, 60))
             response.raise_for_status()
         except requests.exceptions.HTTPError as e:
             print(f"HTTP error getting file from URL: {file_url}. {str(e)}")
@@ -317,7 +299,7 @@ def _download_file(file_url: str) -> Tuple[bytes, str]:
         except requests.exceptions.Timeout as e:
             print(f"Timeout error getting file from URL: {file_url}. {str(e)}")
             raise RequestException(
-                message="Timeout error accessing file. We use a timeout of 5 seconds."
+                message="Timeout error accessing file. We use a connect timeout of 5 seconds and a read timeout of 60 seconds."
             ) from e
         except requests.exceptions.RequestException as e:
             print(f"Error getting file from URL: {file_url}. {str(e)}")
@@ -327,15 +309,7 @@ def _download_file(file_url: str) -> Tuple[bytes, str]:
 
         return response.content, response.headers.get("content-type", "")
 
-    raise RequestException(message=f"unsupported file URL scheme: {file_url}")
-
-
-def _create_s3_client():
-    s3_client = boto3.client("s3")
-    bucket_name = os.environ.get("S3_BUCKET_NAME")
-    # S3_BUCKET_NAME is optional — only required when the file_url is a bare "s3://<key>"
-    # (no bucket in the URL). For "s3://<bucket>/<key>" form it's ignored.
-    return s3_client, bucket_name
+    raise RequestException(message="file_url must be an HTTPS presigned URL")
 
 
 # Convert class definitions to a JSON schema string for page classification tasks
