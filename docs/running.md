@@ -164,13 +164,24 @@ modal run examples/modal_paddle_smoke.py \
 
 What the Modal function does:
 
-- Builds a GPU image with PaddleOCR-VL, vLLM server dependencies, and this repo.
+- Starts from Paddle's prebuilt `paddleocr-genai-vllm-server` GPU image and
+  installs this repo plus the lightweight Open Ingest runtime dependencies.
+- Installs PaddleX OCR/GenAI client extras for the local layout-analysis client
+  that calls the vLLM recognition server.
+- Installs CPU PaddlePaddle for the client-side layout detector; VLM recognition
+  still runs on the Modal GPU through the local vLLM server.
 - Starts `paddleocr genai_server` inside the Modal GPU container.
 - Waits for `http://127.0.0.1:8118/v1/models`.
 - Runs the existing Open Ingest local runner inside that same GPU container with
   `ocr_model="paddle-ocr-vl"`.
+- Requests Modal's minimum 512 GiB ephemeral disk for this GPU/image shape.
 - Returns the parsed document to your Mac and writes
   `./debug/modal-paddle-smoke/document.json` plus `document.md`.
+
+The first image pull is large because Paddle's prebuilt vLLM server image is
+multi-GB. Modal should cache the image layers after the first successful build,
+so later smoke runs should mostly pay model startup and inference time rather
+than rebuilding the environment.
 
 Optional arguments:
 

@@ -1,11 +1,23 @@
 # SPDX-License-Identifier: Apache-2.0
 from collections import OrderedDict
 from typing import Any, Optional, List
-from itertools import batched
 import time
 from tensorlake_docai.pipeline.routing import FILE_TYPE_MAPPING
 from tensorlake_docai.ocr import image_preprocessing_utils
 from PIL import Image
+
+try:
+    from itertools import batched
+except ImportError:
+    from itertools import islice
+
+    def batched(iterable, n):
+        if n < 1:
+            raise ValueError("n must be at least one")
+        iterator = iter(iterable)
+        while batch := tuple(islice(iterator, n)):
+            yield batch
+
 
 try:
     from pillow_heif import register_heif_opener

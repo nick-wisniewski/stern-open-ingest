@@ -79,3 +79,31 @@ def test_paddle_result_to_page_layout_falls_back_to_layout_boxes():
     assert len(layout.elements) == 1
     assert layout.elements[0].fragment_type == PageFragmentType.TEXT
     assert layout.elements[0].ocr_text == ""
+
+
+def test_paddle_result_to_page_layout_uses_markdown_when_blocks_are_empty():
+    paddle_result = {
+        "res": {
+            "layout_det_res": {
+                "boxes": [
+                    {
+                        "label": "text",
+                        "coordinate": [0, 0, 50, 20],
+                        "score": 0.7,
+                    }
+                ]
+            },
+            "markdown": {"markdown_texts": ["Policy text", "More text"]},
+        }
+    }
+
+    layout = paddle_result_to_page_layout(
+        paddle_result,
+        page_number=1,
+        image_size=(50, 20),
+        pdf_size=(50, 20),
+    )
+
+    assert len(layout.elements) == 1
+    assert layout.elements[0].fragment_type == PageFragmentType.TEXT
+    assert layout.elements[0].ocr_text == "Policy text\n\nMore text"

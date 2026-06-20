@@ -879,7 +879,17 @@ def process_all_figures_batch(
 
         print(f"Processing {total_figures} figures in sub-batches of {subbatch_size}")
 
-        from itertools import batched
+        try:
+            from itertools import batched
+        except ImportError:
+            from itertools import islice
+
+            def batched(iterable, n):
+                if n < 1:
+                    raise ValueError("n must be at least one")
+                iterator = iter(iterable)
+                while batch := tuple(islice(iterator, n)):
+                    yield batch
 
         processed_count = 0
         for subbatch_inputs, subbatch_metadata in zip(

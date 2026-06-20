@@ -3,6 +3,7 @@ import os
 import subprocess
 import tempfile
 import time
+import traceback
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -20,6 +21,7 @@ PADDLE_OCR_VL_MEMORY_IN_GB = int(os.getenv("PADDLE_OCR_VL_MEMORY_IN_GB", "24"))
 PADDLE_OCR_VL_GPU_MODELS = os.getenv("PADDLE_OCR_VL_GPU_MODELS", "L4,A10G").split(",")
 PADDLE_OCR_VL_SERVER_URL = os.getenv("PADDLE_OCR_VL_SERVER_URL", "http://127.0.0.1:8118/v1")
 PADDLE_OCR_VL_REC_BACKEND = os.getenv("PADDLE_OCR_VL_REC_BACKEND", "vllm-server")
+PADDLE_OCR_VL_DEVICE = os.getenv("PADDLE_OCR_VL_DEVICE")
 
 
 def _cuda_is_available() -> bool:
@@ -64,7 +66,10 @@ def _unwrap_paddle_result(result: Any) -> dict[str, Any]:
         raise RequestException(message="PaddleOCR-VL returned a non-dictionary result.")
 
     nested = raw.get("res")
-    return nested if isinstance(nested, dict) else raw
+    data = nested if isinstance(nested, dict) else raw
+    if hasattr(result, "markdown"):
+        data["_markdown_result"] = result.markdown
+    return data
 
 
 def _coerce_bbox(value: Any) -> tuple[float, float, float, float] | None:
@@ -167,6 +172,21 @@ def _iter_parsing_blocks(result: dict[str, Any]) -> Iterable[dict[str, Any]]:
             }
 
 
+def _markdown_text_from_result(result: dict[str, Any]) -> str:
+    markdown = result.get("_markdown_result") or result.get("markdown")
+    if not isinstance(markdown, dict):
+        return ""
+
+    markdown_texts = markdown.get("markdown_texts")
+    if isinstance(markdown_texts, str):
+        return markdown_texts
+    if isinstance(markdown_texts, list):
+        return "\n\n".join(str(text) for text in markdown_texts if text)
+
+    text = markdown.get("text")
+    return text if isinstance(text, str) else ""
+
+
 def paddle_result_to_page_layout(
     result: Any,
     *,
@@ -213,6 +233,21 @@ def paddle_result_to_page_layout(
             )
         )
 
+    if not any((element.ocr_text or "").strip() for element in elements):
+        markdown_text = _markdown_text_from_result(data).strip()
+        if markdown_text:
+            elements = [
+                PageLayoutElement(
+                    bbox=(0.0, 0.0, float(pdf_size[0]), float(pdf_size[1])),
+                    fragment_type=PageFragmentType.TEXT,
+                    score=1.0,
+                    reading_order=0,
+                    ref_id=f"{page_number}.0",
+                    ocr_text=markdown_text,
+                    markdown=markdown_text,
+                )
+            ]
+
     elements.sort(key=lambda element: element.reading_order)
     return PageLayout(
         elements=elements,
@@ -237,13 +272,26 @@ class PaddleOCRVLTask(BatchProcessor):
         print(
             "Initializing PaddleOCR-VL client "
             f"(vl_rec_backend={PADDLE_OCR_VL_REC_BACKEND!r}, "
-            f"server={PADDLE_OCR_VL_SERVER_URL!r})"
+            f"server={PADDLE_OCR_VL_SERVER_URL!r}, "
+            f"device={PADDLE_OCR_VL_DEVICE!r})"
         )
-        self.pipeline = PaddleOCRVL(
-            vl_rec_backend=PADDLE_OCR_VL_REC_BACKEND,
-            vl_rec_server_url=PADDLE_OCR_VL_SERVER_URL,
-            format_block_content=True,
-        )
+        kwargs = {
+            "vl_rec_backend": PADDLE_OCR_VL_REC_BACKEND,
+            "vl_rec_server_url": PADDLE_OCR_VL_SERVER_URL,
+            "format_block_content": True,
+        }
+        if PADDLE_OCR_VL_DEVICE:
+            kwargs["device"] = PADDLE_OCR_VL_DEVICE
+
+        try:
+            self.pipeline = PaddleOCRVL(**kwargs)
+        except Exception as e:
+            raise RequestException(
+                message=(
+                    "Failed to initialize PaddleOCR-VL client pipeline: "
+                    f"{type(e).__name__}: {e}\n{traceback.format_exc()}"
+                )
+            ) from e
 
     async def process_batch(self, processing_batch, batch_number):
         self._initialize_pipeline()

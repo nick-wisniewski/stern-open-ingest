@@ -30,6 +30,11 @@ REMOTE_ROOT = "/root/stern-open-ingest"
 PADDLE_SERVER_URL = "http://127.0.0.1:8118/v1"
 PADDLE_SERVER_MODELS_URL = f"{PADDLE_SERVER_URL}/models"
 PADDLE_MODEL_NAME = "PaddleOCR-VL-1.6-0.9B"
+MODAL_GPU = "L4"
+PADDLE_VLLM_IMAGE = (
+    "ccr-2vdh3abv-pub.cnc.bj.baidubce.com/"
+    "paddlepaddle/paddleocr-genai-vllm-server:latest-nvidia-gpu"
+)
 
 MIME_BY_EXT = {
     ".pdf": "application/pdf",
@@ -43,20 +48,30 @@ MIME_BY_EXT = {
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
 image = (
-    modal.Image.debian_slim(python_version="3.12")
+    modal.Image.from_registry(PADDLE_VLLM_IMAGE)
+    .entrypoint([])
     .apt_install(
         "git",
-        "libgl1",
-        "libglib2.0-0",
         "libmagic1",
         "poppler-utils",
     )
     .pip_install(
-        "paddlepaddle-gpu",
-        "paddleocr[doc-parser]",
-        extra_index_url="https://www.paddlepaddle.org.cn/packages/stable/cu126/",
+        "python-magic==0.4.27",
+        "pillow-heif",
+        "pypdf",
+        "pymupdf",
+        "img2pdf==0.6.3",
+        "psutil",
+        "jdeskew==0.3.0",
+        "markdownify",
+        "requests",
     )
-    .run_commands("paddleocr install_genai_server_deps vllm")
+    .run_commands(
+        "python -m pip install paddlepaddle==3.2.1 "
+        "-i https://www.paddlepaddle.org.cn/packages/stable/cpu/"
+    )
+    .run_commands("python -m pip install 'paddlex[ocr,genai-client]'")
+    .run_commands("python -m pip install tensorlake --no-deps")
     .add_local_dir(
         REPO_ROOT,
         remote_path=REMOTE_ROOT,
@@ -73,7 +88,9 @@ image = (
             ".tensorlake",
         ],
     )
-    .run_commands(f"cd {REMOTE_ROOT} && python -m pip install -e .")
+    .run_commands(
+        f"cd {REMOTE_ROOT} && python -m pip install -e . --no-deps --ignore-requires-python"
+    )
 )
 
 app = modal.App(APP_NAME)
@@ -87,11 +104,18 @@ def _mime_from_file_name(file_name: str) -> str:
     return MIME_BY_EXT.get(Path(file_name).suffix.lower(), "application/pdf")
 
 
-def _wait_for_server(timeout_seconds: int = 900) -> None:
+def _wait_for_server(server: subprocess.Popen, timeout_seconds: int = 900) -> None:
     deadline = time.time() + timeout_seconds
     last_error: Exception | None = None
 
     while time.time() < deadline:
+        exit_code = server.poll()
+        if exit_code is not None:
+            raise RuntimeError(
+                "PaddleOCR-VL recognition server exited before becoming ready "
+                f"(exit_code={exit_code})."
+            )
+
         try:
             with urllib.request.urlopen(PADDLE_SERVER_MODELS_URL, timeout=5) as response:
                 if response.status < 500:
@@ -127,10 +151,10 @@ def _start_paddle_server() -> subprocess.Popen:
 
 @app.function(
     image=image,
-    gpu="L4",
+    gpu=MODAL_GPU,
     cpu=8,
     memory=32768,
-    ephemeral_disk=80_000,
+    ephemeral_disk=524_288,
     timeout=60 * 60,
 )
 def run_smoke_on_gpu(
@@ -144,10 +168,11 @@ def run_smoke_on_gpu(
     os.environ["ENABLE_GPU_OCR_TASKS"] = "1"
     os.environ["PADDLE_OCR_VL_SERVER_URL"] = PADDLE_SERVER_URL
     os.environ["PADDLE_OCR_VL_REC_BACKEND"] = "vllm-server"
+    os.environ["PADDLE_OCR_VL_DEVICE"] = "cpu"
 
     server = _start_paddle_server()
     try:
-        _wait_for_server()
+        _wait_for_server(server)
 
         from tensorlake.applications import run_local_application
         from tensorlake_docai.pipeline.api import ParseRequest, ParsedDocument
