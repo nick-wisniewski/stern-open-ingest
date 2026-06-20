@@ -59,6 +59,7 @@ set -a; source .env; set +a
 | Feature | Required env vars |
 |---|---|
 | `ocr_model="dots-ocr"` | none — needs a CUDA GPU host |
+| `ocr_model="paddle-ocr-vl"` | `ENABLE_GPU_OCR_TASKS=1`, CUDA GPU host, local PaddleOCR-VL recognition server |
 | Key-value extraction | `GEMINI_API_KEY` (default provider) or another LLM key |
 | Table merging | `GEMINI_API_KEY` (default provider) or another LLM key |
 
@@ -88,6 +89,101 @@ docs, routing predicates, etc.).
 
 ---
 
+## 2c. GPU pipeline (`paddle-ocr-vl`)
+
+`paddle-ocr-vl` uses a local PaddleOCR client for document parsing and points the
+multimodal recognition step at a local vLLM/SGLang-style server. Run both the
+server and the `--local` Python process on a CUDA-equipped host.
+
+**Task registration.** Enable GPU task imports before running the workflow:
+
+```bash
+export ENABLE_GPU_OCR_TASKS=1
+```
+
+**Start the recognition server.** Paddle's docs recommend the dedicated server
+image or the `paddleocr genai_server` CLI. A vLLM server launch looks like:
+
+```bash
+paddleocr genai_server \
+  --model_name PaddleOCR-VL-1.6-0.9B \
+  --host 0.0.0.0 \
+  --port 8118 \
+  --backend vllm
+```
+
+Set the client env vars to match the server:
+
+```bash
+export PADDLE_OCR_VL_SERVER_URL=http://127.0.0.1:8118/v1
+export PADDLE_OCR_VL_REC_BACKEND=vllm-server
+```
+
+Optional sizing knobs:
+
+```bash
+export PADDLE_OCR_VL_MEMORY_IN_GB=24
+export PADDLE_OCR_VL_GPU_MODELS=L4,A10G
+```
+
+**One-page smoke test.**
+
+```bash
+python examples/parse_pdf.py \
+  --file sample.pdf \
+  --ocr-model paddle-ocr-vl \
+  --pages 1 \
+  --local
+```
+
+The CLI preflights CUDA and `PADDLE_OCR_VL_SERVER_URL/models` before rendering
+pages. Output is written to `./debug/document.json` and `./debug/document.md`.
+
+---
+
+## 2d. Modal smoke test from a Mac
+
+If you are on a Mac, use Modal to get the CUDA host for the Paddle smoke test.
+This is still a smoke harness, not the production receiver/queue/webhook
+deployment.
+
+Install and authenticate Modal locally:
+
+```bash
+python -m pip install modal
+modal setup
+```
+
+Run one page on a Modal L4 GPU:
+
+```bash
+modal run examples/modal_paddle_smoke.py \
+  --file sample.pdf \
+  --pages 1
+```
+
+What the Modal function does:
+
+- Builds a GPU image with PaddleOCR-VL, vLLM server dependencies, and this repo.
+- Starts `paddleocr genai_server` inside the Modal GPU container.
+- Waits for `http://127.0.0.1:8118/v1/models`.
+- Runs the existing Open Ingest local runner inside that same GPU container with
+  `ocr_model="paddle-ocr-vl"`.
+- Returns the parsed document to your Mac and writes
+  `./debug/modal-paddle-smoke/document.json` plus `document.md`.
+
+Optional arguments:
+
+```bash
+modal run examples/modal_paddle_smoke.py \
+  --file sample.pdf \
+  --pages 1,2 \
+  --out debug/my-paddle-smoke \
+  --table-output-mode markdown
+```
+
+---
+
 ## 3. Run locally
 
 ```bash
@@ -101,7 +197,7 @@ What `--local` does:
 - External HTTP calls (OpenAI, Anthropic, Gemini) still happen for real.
 - `print(...)` and `breakpoint()` work normally; you see every routing decision
   in your terminal.
-- `dots-ocr` runs in-process too; you need a CUDA GPU on the host.
+- GPU OCR runs in-process too; you need a CUDA GPU on the host.
 
 Output: `./debug/document.json` plus `./debug/document.md`.
 

@@ -16,7 +16,10 @@ Output: ./debug/document.json plus ./debug/document.md.
 
 import argparse
 import base64
+import urllib.error
+import urllib.request
 import shutil
+import os
 from pathlib import Path
 
 from tensorlake.applications import run_local_application, run_remote_application
@@ -26,6 +29,10 @@ from tensorlake_docai.pipeline.api import (
     ParsedDocument,
 )
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload
+
+PADDLE_OCR_MODEL = "paddle-ocr-vl"
+PADDLE_SERVER_URL_ENV = "PADDLE_OCR_VL_SERVER_URL"
+PADDLE_DEFAULT_SERVER_URL = "http://127.0.0.1:8118/v1"
 
 MIME_BY_EXT = {
     ".pdf": "application/pdf",
@@ -69,7 +76,40 @@ def build_request(args: argparse.Namespace) -> ParseRequest:
     )
 
 
-def main() -> None:
+def check_paddle_preflight(ocr_model: str, timeout: float = 3.0) -> None:
+    if ocr_model != PADDLE_OCR_MODEL:
+        return
+
+    from tensorlake_docai.ocr.paddle_ocr_vl import _cuda_is_available
+
+    if not _cuda_is_available():
+        raise RuntimeError(
+            "paddle-ocr-vl requires CUDA, but no usable GPU was detected. "
+            "Run this smoke test on a CUDA-equipped host."
+        )
+
+    server_url = os.getenv(PADDLE_SERVER_URL_ENV, PADDLE_DEFAULT_SERVER_URL).rstrip("/")
+    models_url = f"{server_url}/models"
+    try:
+        with urllib.request.urlopen(models_url, timeout=timeout) as response:
+            if response.status >= 500:
+                raise RuntimeError(
+                    f"PaddleOCR-VL recognition server returned HTTP {response.status} "
+                    f"from {models_url}."
+                )
+    except urllib.error.HTTPError as e:
+        if e.code >= 500:
+            raise RuntimeError(
+                f"PaddleOCR-VL recognition server returned HTTP {e.code} from {models_url}."
+            ) from e
+    except (OSError, TimeoutError, urllib.error.URLError) as e:
+        raise RuntimeError(
+            f"PaddleOCR-VL recognition server is not reachable at {models_url}. "
+            f"Start the local vLLM/SGLang server or set {PADDLE_SERVER_URL_ENV}."
+        ) from e
+
+
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -80,7 +120,7 @@ def main() -> None:
     core.add_argument(
         "--ocr-model",
         default="dots-ocr",
-        choices=["dots-ocr"],
+        choices=["dots-ocr", PADDLE_OCR_MODEL],
         help="OCR backend (see docs/models.md). Default: dots-ocr.",
     )
     core.add_argument("--pages", type=int, nargs="*", help="Pages to parse (1-indexed)")
@@ -122,9 +162,14 @@ def main() -> None:
         help="Detect repeating cross-page headers/footers",
     )
 
-    args = parser.parse_args()
+    return parser
+
+
+def main() -> None:
+    args = build_parser().parse_args()
 
     req = build_request(args)
+    check_paddle_preflight(req.ocr_model)
 
     runner = run_local_application if args.local else run_remote_application
     handle = runner(normalize_file_type_and_upload, req.model_dump())
