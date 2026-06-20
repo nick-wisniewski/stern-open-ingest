@@ -38,6 +38,16 @@ def test_unknown_ocr_model_rejected():
         )
 
 
+def test_paddle_ocr_vl_model_accepted():
+    req = ParseRequest(
+        file_name="x.pdf",
+        mime_type="application/pdf",
+        file_bytes="aGVsbG8=",
+        ocr_model="paddle-ocr-vl",
+    )
+    assert req.ocr_model == "paddle-ocr-vl"
+
+
 def test_legacy_model_codes_rejected():
     # Internal `model0X` names from the Inkwell codebase are no longer
     # accepted on the public API.

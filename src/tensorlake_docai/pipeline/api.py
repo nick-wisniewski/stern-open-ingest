@@ -147,7 +147,7 @@ class ParseRequest(BaseModel):
     skew_correction: bool = False
     debug: bool = False
     table_output_mode: Optional[Literal["html", "markdown"]] = "markdown"
-    ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
+    ocr_model: Optional[Literal["dots-ocr", "paddle-ocr-vl"]] = "dots-ocr"
     table_merging: bool = False
     key_value_extraction: Optional[bool] = False
     ignore_sections: Optional[Set[PageFragmentType]] = None

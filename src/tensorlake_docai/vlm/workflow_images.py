@@ -58,6 +58,20 @@ ocr_gpu_cuda_image = (
 )
 
 
+paddle_ocr_vl_image = (
+    Image(base_image="python:3.12-slim", name="documentai/paddle-ocr-vl")
+    .env("DEBIAN_FRONTEND", "noninteractive")
+    .run(
+        "apt-get update && apt-get install -y libgl1 libglib2.0-0 git && rm -rf /var/lib/apt/lists/*"
+    )
+    .run("python -m pip install --upgrade pip wheel setuptools")
+    .run(f"pip install '{PYDANTIC_PIN}'")
+    .run("pip install pillow numpy pymupdf markdownify")
+    .run("pip install paddlepaddle-gpu 'paddleocr[doc-parser]'")
+    .run("pip cache purge")
+)
+
+
 file_convertion_image = (
     Image(base_image="python:3.12-slim", name="documentai/file-convert")
     .env("DEBIAN_FRONTEND", "noninteractive")

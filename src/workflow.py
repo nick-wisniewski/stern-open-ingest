@@ -16,11 +16,12 @@ Usage:
 # Application entry — file conversion + OCR routing.
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload  # noqa: F401
 
-# `dots-ocr` GPU path — requires a CUDA-equipped worker (vLLM + CUDA, multi-GB
-# image). Disabled by default so a non-GPU runner does not have to build the
-# heavy `ocr-gpu-cuda` image. Re-enable both imports once you have a GPU host.
+# GPU OCR paths — require CUDA-equipped workers and multi-GB images. Disabled by
+# default so a non-GPU runner does not have to build the heavy OCR images.
+# Re-enable the relevant imports once you have a GPU host.
 # from tensorlake_docai.ocr.dots_ocr import DotsOCRTask  # noqa: F401
 # from tensorlake_docai.ocr.figure_ocr import OvisFigureOCRTask  # noqa: F401
+# from tensorlake_docai.ocr.paddle_ocr_vl import PaddleOCRVLTask  # noqa: F401
 
 # Post-OCR enrichment.
 from tensorlake_docai.tables.table_merging import TableMerging  # noqa: F401

@@ -14,6 +14,7 @@ from typing import Optional
 # module load — are only imported when actually dispatched to.
 OCR_BACKENDS: dict[str, str] = {
     "dots-ocr": "tensorlake_docai.ocr.dots_ocr.DotsOCRTask",
+    "paddle-ocr-vl": "tensorlake_docai.ocr.paddle_ocr_vl.PaddleOCRVLTask",
 }
 
 DEFAULT_OCR_MODEL = "dots-ocr"

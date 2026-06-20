@@ -8,6 +8,7 @@ from tensorlake_docai.ocr import OCR_BACKENDS, DEFAULT_OCR_MODEL
 def test_supported_models():
     assert set(OCR_BACKENDS) == {
         "dots-ocr",
+        "paddle-ocr-vl",
     }
 
 
@@ -22,6 +23,7 @@ def test_backend_class_paths_stable():
     # Stringified class paths — the pipeline imports these lazily so that
     # GPU-only modules don't load in non-GPU workers.
     assert OCR_BACKENDS["dots-ocr"] == "tensorlake_docai.ocr.dots_ocr.DotsOCRTask"
+    assert OCR_BACKENDS["paddle-ocr-vl"] == "tensorlake_docai.ocr.paddle_ocr_vl.PaddleOCRVLTask"
 
 
 def test_default_model_is_in_registry():

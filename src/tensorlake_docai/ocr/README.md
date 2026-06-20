@@ -107,3 +107,13 @@ to `["H100", "A100-80GB"]` via the `gpu=` parameter on their `@function(...)`
 decorators and raise a `RequestError` at startup if `torch.cuda.is_available()`
 is false. If your new backend has similar host requirements, add an analogous
 guard at the top of its `run()` method.
+
+This fork also registers `paddle-ocr-vl` as a non-default CUDA backend. It keeps
+the Paddle imports lazy, adapts Paddle's `parsing_res_list` JSON into the shared
+`PageLayout` / `PageLayoutElement` models, and expects a local PaddleOCR-VL VLM
+recognition server configured by `PADDLE_OCR_VL_SERVER_URL` and
+`PADDLE_OCR_VL_REC_BACKEND`.
+
+`src/workflow.py` deliberately leaves heavyweight GPU OCR imports commented by
+default so CPU-only local runners do not build GPU images. Uncomment the OCR
+task import for the GPU worker you are actually running.

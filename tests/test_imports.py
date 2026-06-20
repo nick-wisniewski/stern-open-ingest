@@ -13,6 +13,7 @@ import pytest
 OCR_PROVIDERS = [
     ("tensorlake_docai.ocr.dots_ocr", "DotsOCRTask"),
     ("tensorlake_docai.ocr.figure_ocr", "OvisFigureOCRTask"),
+    ("tensorlake_docai.ocr.paddle_ocr_vl", "PaddleOCRVLTask"),
 ]
 
 
