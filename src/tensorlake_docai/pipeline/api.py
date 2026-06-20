@@ -146,10 +146,8 @@ class ParseRequest(BaseModel):
     mime_type: str
     skew_correction: bool = False
     debug: bool = False
-    table_parsing_strategy: Optional[Literal["tsr", "vlm"]] = "vlm"
-    table_output_mode: Optional[Literal["html", "json", "markdown"]] = "markdown"
+    table_output_mode: Optional[Literal["html", "markdown"]] = "markdown"
     ocr_model: Optional[Literal["dots-ocr"]] = "dots-ocr"
-    disable_layout_detection: Optional[bool] = False
     table_merging: bool = False
     key_value_extraction: Optional[bool] = False
     ignore_sections: Optional[Set[PageFragmentType]] = None

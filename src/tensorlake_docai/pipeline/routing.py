@@ -7,14 +7,12 @@ import asyncio
 import base64
 import re
 import time
-from typing import List, Optional, Tuple
+from typing import Tuple
 
 import requests
 from tensorlake_docai.pipeline.api import PageFragmentType, ParseRequest
 from tensorlake_docai.models.intermediate_objects import FileData, ParseResult
 from tensorlake.applications import RequestError as RequestException
-
-KEY_PATH_PREFIX = "workflow-step-output"
 
 # File type mapping - shared with file_convertor.py
 FILE_TYPE_MAPPING = {
@@ -170,24 +168,6 @@ def markdown_to_html_table(markdown: str) -> str:
     return "".join(html_parts)
 
 
-def validate_pdf_pages(pdf_file_path: str, requested_pages: Optional[List[int]] = None) -> int:
-    """
-    Get total page count from PDF. Page validation happens upstream in file_convertor.py,
-    so this function just returns the total pages for reference.
-    """
-    try:
-        from pypdf import PdfReader
-
-        pdf_total_pages = len(PdfReader(str(pdf_file_path)).pages)
-    except Exception as e:
-        print(f"Failed to read PDF for page validation: {e}")
-        raise RequestException(
-            message="Unable to process PDF file. Please ensure the file is valid and not corrupted."
-        )
-
-    return pdf_total_pages
-
-
 def handle_processing_error(
     exception: Exception, processing_context: str, service_type: str = "document"
 ) -> str:
@@ -220,7 +200,7 @@ def handle_processing_error(
     # Quota / usage limits
     elif "quota" in error_str or "usage limit" in error_str:
         print("📊 Detected: API quota exceeded")
-        return "Service usage limit reached. Please contact Tensorlake support with the trace ID of the job."
+        return "Service usage limit reached. Please try again later or contact the service owner."
 
     # Timeout issues
     elif "timeout" in error_str or "timed out" in error_str:
@@ -228,7 +208,7 @@ def handle_processing_error(
         if service_type == "document":
             return "Document processing timed out. For large documents, please try processing fewer pages at once."
         else:
-            return "Processing timed out. Please try again or contact Tensorlake support."
+            return "Processing timed out. Please try again or contact the service owner."
 
     # Authentication / credential errors
     elif any(
@@ -236,7 +216,7 @@ def handle_processing_error(
         for term in ["credentials", "unauthorized", "access denied", "authentication", "403", "401"]
     ):
         print("📊 Detected: Authentication/credential issue")
-        return "Service temporarily unavailable due to authentication error. Please contact Tensorlake support with the trace ID of the job."
+        return "Service temporarily unavailable due to authentication error. Please contact the service owner."
 
     # File corruption / format issues
     elif any(
@@ -261,14 +241,14 @@ def handle_processing_error(
     elif any(term in error_str for term in ["memory", "out of memory", "too large", "file size"]):
         print("📊 Detected: Memory/resource issue")
         if service_type == "document":
-            return "Document too large to process. Please try processing fewer pages at once or contact Tensorlake support."
+            return "Document too large to process. Please try processing fewer pages at once."
         else:
-            return "File too large to process. Please try with a smaller file or contact Tensorlake support."
+            return "File too large to process. Please try with a smaller file."
 
     # Generic processing errors
     else:
         print("📊 Detected: General processing error")
-        return f"{service_type.title()} processing failed. Please try again or contact Tensorlake support with the trace ID of the job."
+        return f"{service_type.title()} processing failed. Please try again or contact the service owner."
 
 
 def download_file(request: ParseRequest) -> FileData:

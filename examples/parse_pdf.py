@@ -93,7 +93,7 @@ def main() -> None:
     output.add_argument(
         "--table-output-mode",
         default="markdown",
-        choices=["markdown", "html", "json"],
+        choices=["markdown", "html"],
         help="Format of table content in the output",
     )
     output.add_argument(

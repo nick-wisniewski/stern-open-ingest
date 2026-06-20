@@ -11,7 +11,7 @@ from tensorlake_docai.pipeline.routing import _download_file
 def test_minimal_request_with_bytes():
     req = ParseRequest(file_name="x.pdf", mime_type="application/pdf", file_bytes="aGVsbG8=")
     assert req.ocr_model == "dots-ocr"  # default
-    assert req.table_parsing_strategy == "vlm"
+    assert req.table_output_mode == "markdown"
 
 
 def test_minimal_request_with_url():
@@ -67,8 +67,10 @@ def test_removed_enrichment_fields_stay_removed():
         "include_full_page_image",
         "include_images",
         "chunk_strategy",
+        "disable_layout_detection",
         "org_quota",
         "page_classification_request",
+        "table_parsing_strategy",
         "table_summarization",
         "table_summarization_prompt",
     }

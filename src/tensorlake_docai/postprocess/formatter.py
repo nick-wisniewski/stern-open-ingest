@@ -17,10 +17,6 @@ from tensorlake_docai.pipeline.api import (
 
 from tensorlake_docai.models.layout_objects import PageLayout
 
-from tensorlake.applications import (
-    RequestError as RequestException,
-)
-
 
 def escape_markdown_content(content: str) -> str:
     """
@@ -169,7 +165,6 @@ def document_layout_to_document(
     scale_factor: float,
     ignore_sections: Optional[set] = None,
     merged_tables: Optional[List[MergedTable]] = None,
-    chunking_strategy: str = "none",
 ) -> List[Page]:
     from markdownify import markdownify
 
@@ -279,9 +274,6 @@ def document_layout_to_document(
     parsed_pages.sort(key=lambda x: x.page_number)
 
     if merged_tables:
-        if chunking_strategy == "page":
-            raise RequestException("Table merging is not supported with 'page' chunking strategy.")
-
         ref_ids_to_remove = set()
         page_to_merged_tables = {}
 

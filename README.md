@@ -160,7 +160,7 @@ stern-open-ingest/
 │       ├── pipeline/            # file_converter, routing, output_formatter, api
 │       ├── ocr/                 # dots_ocr, figure_ocr (BYO-OCR registry)
 │       ├── vlm/                 # retained VLM key-value extraction task
-│       ├── extraction/          # output chunking and key-value extraction helpers
+│       ├── extraction/          # key-value extraction helpers
 │       ├── tables/              # cross-page merging and correction
 │       ├── postprocess/         # header correction, formatter, output cleaner
 │       ├── models/              # ParseResult, PageLayout, etc.

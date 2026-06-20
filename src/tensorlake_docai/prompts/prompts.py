@@ -1,70 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # pylint: disable=line-too-long
 # flake8: noqa: E501
-from tensorlake_docai.pipeline.api import PageFragmentType
-
-TABLE_EXTRACTOR_SYSTEM_PROMPT = (
-    """You are a helpful AI assistant specialized in extracting table data from images."""
-)
-
-TABLE_EXTRACTOR_USER_PROMPT = """[INST] Extract information from the table image as structured data. 
-* Format the output as markdown. 
-* Strictly return the extracted output only, and nothing else. Don't add any other text in the beggining of the output.
-* If there are radio boxes or checkboxes, only include the text around the checkbox thats checked or marked. If none of the checkboxes are checked, return an empty string.
-* INCLUDE ALL the information on the table.
-* Don't add backticks or any other formating information like ```markdown or ```json in the output
-[/INST]
-"""
-
-FIGURE_EXTRACTOR_SYSTEM_PROMPT = (
-    """You are a helpful AI assistant specialized in extracting figure data from images."""
-)
-
-FIGURE_EXTRACTOR_USER_PROMPT = """Extract information from the figure:
-
-* If it is a table: Convert to structured markdown with title and caption
-* If it is a graph or chart: Identify type and describe key data trends
-* If it contains text: Extract all printed or handwritten content
-* If it's a mathematical formula: Transcribe using LaTeX notation
-* If it has checkboxes: Only include text for selected options (empty string if none)
-
-Return only extracted information in markdown format without additional commentary.
-"""
-
-
-KEY_VALUE_EXTRACTOR_USER_PROMPT = """[INST] Extract information from the document fragment:
-
-* If it is a table, extract the table data into a structured markdown format, along with table title and caption. 
-* If it is a graph or chart, describe it in detail.
-* If it contains printed or handwritten text, extract all the text.
-* If there are radio boxes or checkboxes, only include the text around the checkbox thats checked or marked. If none of the checkboxes are checked, return an empty string.
-* If it contains labeled fields or key-value pairs, extract them into structured markdown with question and answer pairs.
-Don't add ```text or ```markdown in the output.
-[/INST]
-"""
-
-DOCUMENT_INDEX_SYSTEM_PROMPT = (
-    """You are a helpful AI assistant specialized in extracting document index from images."""
-)
-
-DOCUMENT_INDEX_USER_PROMPT = """[INST] This is a cropped image from a document. This is a document index.Extract information from the document index:
-* Extract the document index from the image.
-* Return the document index in a structured markdown format. Don't include any additional markup like ```markdown or ```json.
-[/INST]
-"""
-
-OCR_SYSTEM_PROMPT = """You are an OCR modelspecialized in extracting text from images."""
-OCR_PROMPT = """
-(<image>./</image>)
-[INST]
-Extract the text in the image. If this is written, printed or text, only extract the text. If it's a picture with some text on the scene, extract only the text. 
-Don't describe the image. 
-Don't add any other text or information at the beginning of the text.
-Don't add ```text or ```markdown in the output.
-ABSOLUTELY DON'T REPEAT THE TEXT OR HALLUCINATE ANYTHING. 
-IF THE IMAGE IS EMPTY RETURN |notext| 
-[/INST]
-"""
 
 TABLE_MERGING_PROMPTS = {
     "merged_summary": {
@@ -164,40 +100,6 @@ KEY_VALUE_PROMPTS = {
         "Preserve the structure and order as much as possible.",
     },
 }
-
-
-QWEN_TABLE_TO_MARKDOWN_SYSTEM_PROMPT = "You are an AI assistant specialized in recognizing and extracting text from images. Your mission is to analyze the image and generate result in markdown and only use the text in the image."
-QWEN_TABLE_TO_MARKDOWN_PROMPT = "Convert the document fragment to markdown. Do not include the text not on the image, do not include other outputs."
-
-# HTML versions of table prompts
-QWEN_TABLE_TO_HTML_SYSTEM_PROMPT = "You are an AI assistant specialized in recognizing and extracting text from images. Your mission is to analyze the image and generate result in HTML and only use the text in the image."
-QWEN_TABLE_TO_HTML_PROMPT = "Convert the document fragment to HTML. Do not include the text not on the image, do not include other outputs."
-
-
-def get_prompt_messages(cls: PageFragmentType) -> list[str]:
-    if cls in [PageFragmentType.TABLE]:
-        return [TABLE_EXTRACTOR_SYSTEM_PROMPT, TABLE_EXTRACTOR_USER_PROMPT]
-    elif cls in [PageFragmentType.FIGURE, PageFragmentType.FORMULA]:
-        return [FIGURE_EXTRACTOR_SYSTEM_PROMPT, FIGURE_EXTRACTOR_USER_PROMPT]
-    elif cls in [PageFragmentType.FORM, PageFragmentType.KEY_VALUE_REGION]:
-        return [TABLE_EXTRACTOR_SYSTEM_PROMPT, KEY_VALUE_EXTRACTOR_USER_PROMPT]
-    elif cls in [PageFragmentType.DOCUMENT_INDEX]:
-        return [DOCUMENT_INDEX_SYSTEM_PROMPT, DOCUMENT_INDEX_USER_PROMPT]
-    elif cls in [
-        PageFragmentType.TITLE,
-        PageFragmentType.SECTION_HEADER,
-        PageFragmentType.TEXT,
-        PageFragmentType.LIST_ITEM,
-        PageFragmentType.TABLE_CAPTION,
-        PageFragmentType.FIGURE_CAPTION,
-        PageFragmentType.FORMULA_CAPTION,
-        PageFragmentType.PAGE_FOOTER,
-        PageFragmentType.PAGE_HEADER,
-        PageFragmentType.PAGE_NUMBER,
-    ]:
-        return [OCR_SYSTEM_PROMPT, OCR_PROMPT]
-    else:
-        raise ValueError(f"Invalid class name: {cls}")
 
 
 def _get_prompt_messages_from_dict(task: str, prompt_dict: dict, task_type: str) -> list[str]:

@@ -143,7 +143,7 @@ python examples/parse_pdf.py --file my.pdf --local \
 | Flag | Maps to `ParseRequest` field |
 |---|---|
 | `--pages` | `pages_to_parse` (1-indexed) |
-| `--table-output-mode` | `table_output_mode` — `markdown` \| `html` \| `json` |
+| `--table-output-mode` | `table_output_mode` — `markdown` \| `html` |
 | `--ignore-sections` | `ignore_sections` — e.g. `--ignore-sections page_footer figure` |
 
 ### File inputs
