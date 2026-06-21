@@ -57,7 +57,7 @@ def make_handler(config: ReceiverConfig):
 
             job_id = self.path[len(prefix) :]
             try:
-                self._json(store.raw(job_id), HTTPStatus.OK)
+                self._json(_redact_job_response(store.raw(job_id)), HTTPStatus.OK)
             except FileNotFoundError:
                 self._json({"error": "job not found"}, HTTPStatus.NOT_FOUND)
 
@@ -79,6 +79,16 @@ def make_handler(config: ReceiverConfig):
             print(f"{self.address_string()} - {format % args}")
 
     return ParseReceiver
+
+
+def _redact_job_response(record: dict[str, Any]) -> dict[str, Any]:
+    redacted = dict(record)
+    request = redacted.get("request")
+    if isinstance(request, dict) and request.get("file_bytes"):
+        request = dict(request)
+        request["file_bytes"] = f"<redacted base64 bytes: {len(request['file_bytes'])} chars>"
+        redacted["request"] = request
+    return redacted
 
 
 def serve(host: str, port: int, *, redis_url: str, jobs_dir: str) -> None:

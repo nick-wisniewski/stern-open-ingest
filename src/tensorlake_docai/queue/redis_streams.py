@@ -30,6 +30,7 @@ class RedisStreamsQueue:
             raise RuntimeError("Install the `redis` package to use Redis queue workers.") from e
 
         self.client = redis.Redis.from_url(redis_url, decode_responses=True)
+        self._timeout_error = redis.exceptions.TimeoutError
         self.group = group
         self.max_attempts = max_attempts
 
@@ -49,13 +50,16 @@ class RedisStreamsQueue:
             self._ensure_group(queue)
 
         streams = {queue.value: ">" for queue in queues}
-        response = self.client.xreadgroup(
-            self.group,
-            consumer,
-            streams,
-            count=count,
-            block=block_ms,
-        )
+        try:
+            response = self.client.xreadgroup(
+                self.group,
+                consumer,
+                streams,
+                count=count,
+                block=block_ms,
+            )
+        except self._timeout_error:
+            return None
         if not response:
             return None
 

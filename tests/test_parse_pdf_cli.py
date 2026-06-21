@@ -21,6 +21,22 @@ def test_parser_accepts_paddle_ocr_vl():
 
     assert args.ocr_model == "paddle-ocr-vl"
     assert args.pages == [1]
+    assert not args.paddle_preflight
+
+
+def test_parser_accepts_opt_in_paddle_preflight():
+    args = parse_pdf.build_parser().parse_args(
+        [
+            "--file",
+            "sample.pdf",
+            "--ocr-model",
+            "paddle-ocr-vl",
+            "--paddle-preflight",
+            "--local",
+        ]
+    )
+
+    assert args.paddle_preflight
 
 
 def test_build_request_sets_paddle_ocr_model(tmp_path):

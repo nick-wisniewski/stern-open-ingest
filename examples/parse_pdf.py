@@ -127,6 +127,14 @@ def build_parser() -> argparse.ArgumentParser:
     core.add_argument(
         "--local", action="store_true", help="Run in-process instead of remote deploy"
     )
+    core.add_argument(
+        "--paddle-preflight",
+        action="store_true",
+        help=(
+            "Check CUDA and the PaddleOCR-VL server before running. Use this when "
+            "you already know the document should route to Paddle OCR."
+        ),
+    )
     core.add_argument("--out", default="debug", help="Output directory")
 
     output = parser.add_argument_group("output shape")
@@ -169,7 +177,8 @@ def main() -> None:
     args = build_parser().parse_args()
 
     req = build_request(args)
-    check_paddle_preflight(req.ocr_model)
+    if args.paddle_preflight:
+        check_paddle_preflight(req.ocr_model)
 
     runner = run_local_application if args.local else run_remote_application
     handle = runner(normalize_file_type_and_upload, req.model_dump())
