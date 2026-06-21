@@ -267,7 +267,10 @@ class SimplePageCreator:
         from tensorlake.applications import RequestError as RequestException
 
         data = parse_result.request.file_bytes
-        wanted = sorted(set(parse_result.request.pages_to_parse or []))
+        if parse_result.request.ocr_pages is not None:
+            wanted = sorted(set(parse_result.request.ocr_pages))
+        else:
+            wanted = sorted(set(parse_result.request.pages_to_parse or []))
         file_type = FILE_TYPE_MAPPING.get(parse_result.request.mime_type, None)
         if file_type is None:
             raise RequestException(

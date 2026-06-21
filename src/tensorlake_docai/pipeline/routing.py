@@ -309,7 +309,9 @@ def file_convertor_should_go_to_vlm_extraction(request) -> bool:
 
 def file_convertor_should_go_to_ocr(request) -> bool:
     """PDF and image inputs need OCR."""
-    return True
+    if request.ocr_pages is None:
+        return True
+    return bool(request.ocr_pages)
 
 
 # OCR NODE ROUTING (used by every OCR backend after layout extraction)
@@ -390,6 +392,8 @@ def route_after_ocr(parse_result: ParseResult, *, log_prefix: str, dots_ocr: boo
     from tensorlake_docai.tables.table_merging import TableMerging
 
     request = parse_result.request
+    if parse_result.document_layout and parse_result.document_layout.pages:
+        parse_result.document_layout.pages.sort(key=lambda page: page.page_number)
 
     if should_route_to_table_merging(request, parse_result):
         print(f"🔀 {log_prefix} → TableMerging")

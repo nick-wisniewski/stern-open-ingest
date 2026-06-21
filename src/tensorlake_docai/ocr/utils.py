@@ -532,7 +532,7 @@ class BatchProcessor(ABC):
         parse_result: ParseResult,
         image_dimensions: ImageDimensions = ImageDimensions(),
     ) -> ParseResult:
-        if not self.should_preserve_existing_pages():
+        if not self.should_preserve_existing_pages() and parse_result.request.ocr_pages is None:
             parse_result.document_layout.pages = []
 
         batch_generator = self.get_processing_batches(parse_result, image_dimensions)
@@ -656,6 +656,7 @@ class BatchProcessor(ABC):
 
         # Add results to parse_result (OCR tasks always create new pages)
         parse_result.document_layout.pages.extend(all_results)
+        parse_result.document_layout.pages.sort(key=lambda page: page.page_number)
         return parse_result
 
 

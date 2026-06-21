@@ -140,8 +140,11 @@ class ParsedDocumentRef(BaseModel):
 class ParseRequest(BaseModel):
     file_bytes: Optional[str] = None
     file_url: Optional[str] = None
+    webhook_url: Optional[str] = None
 
     pages_to_parse: Optional[List[int]] = None
+    # Internal routing field: classifier-selected pages that still need GPU OCR.
+    ocr_pages: Optional[List[int]] = None
     file_name: str
     mime_type: str
     skew_correction: bool = False

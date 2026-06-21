@@ -8,6 +8,12 @@ from typing import Optional
 from tensorlake.applications import application, function, Retries
 from tensorlake.applications import RequestError as RequestException
 from tensorlake_docai.vlm.cloud import VLMExtractionTask
+from tensorlake_docai.pipeline.born_digital import (
+    classify_pdf_pages,
+    cpu_text_pages_for_request,
+    extract_born_digital_pages,
+    ocr_pages_from_classification,
+)
 from tensorlake_docai.pipeline.output_formatter import format_final_output
 from tensorlake_docai.vlm.workflow_images import file_convertion_image
 from tensorlake_docai.pipeline.api import (
@@ -146,6 +152,37 @@ def process_file_from_s3_or_url(request: ParseRequest) -> None:
     request.file_bytes = file_data.file_bytes
 
 
+def classify_pages_for_ocr(request: ParseRequest, total_document_pages: int) -> None:
+    """Populate internal OCR routing metadata after input normalization."""
+    if request.ocr_pages is not None:
+        request.ocr_pages = [
+            page
+            for page in sorted(set(request.ocr_pages))
+            if 1 <= page <= total_document_pages
+            and (not request.pages_to_parse or page in request.pages_to_parse)
+        ]
+        return
+
+    if request.mime_type != "application/pdf":
+        request.ocr_pages = [1]
+        return
+
+    decisions = classify_pdf_pages(
+        request.file_bytes,
+        total_pages=total_document_pages,
+        pages_to_parse=request.pages_to_parse,
+    )
+    request.ocr_pages = ocr_pages_from_classification(decisions)
+
+    for decision in decisions:
+        print(
+            "Page classification: "
+            f"page={decision.page_number} route={decision.route} "
+            f"reason={decision.reason} text_chars={decision.text_chars} "
+            f"image_area_ratio={decision.image_area_ratio:.2f}"
+        )
+
+
 @application()
 @function(
     description="Validate and normalize PDF/image inputs for the parsing pipeline.",
@@ -225,6 +262,9 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
         usage=usage,
     )
 
+    classify_pages_for_ocr(request, total_document_pages)
+    print(f"OCR pages selected: {request.ocr_pages}")
+
     if file_convertor_should_go_to_output_formatter(request):
         print("🔀 FILE_CONVERTOR → OutputFormatter")
         return format_final_output(parse_result)
@@ -232,6 +272,10 @@ def normalize_file_type_and_upload(raw_request: dict) -> ParseResult | dict:
     if file_convertor_should_go_to_vlm_extraction(request):
         print("🔀 FILE_CONVERTOR → VLMExtractionTask")
         return VLMExtractionTask().run.future(parse_result)
+
+    if cpu_text_pages_for_request(total_document_pages, request):
+        print("🔀 FILE_CONVERTOR → BornDigitalExtraction")
+        return extract_born_digital_pages.future(parse_result)
 
     if file_convertor_should_go_to_ocr(request):
         backend_cls = resolve_ocr_backend(request.ocr_model)

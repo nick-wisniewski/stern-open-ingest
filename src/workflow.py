@@ -17,6 +17,7 @@ import os
 
 # Application entry — file conversion + OCR routing.
 from tensorlake_docai.pipeline.file_converter import normalize_file_type_and_upload  # noqa: F401
+from tensorlake_docai.pipeline.born_digital import extract_born_digital_pages  # noqa: F401
 
 # GPU OCR paths require CUDA-equipped workers and multi-GB images. Keep them
 # disabled by default for CPU-only local runners, but make GPU registration

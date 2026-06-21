@@ -48,6 +48,20 @@ def test_paddle_ocr_vl_model_accepted():
     assert req.ocr_model == "paddle-ocr-vl"
 
 
+def test_queue_routing_fields_are_accepted():
+    req = ParseRequest(
+        file_name="x.pdf",
+        mime_type="application/pdf",
+        file_bytes="aGVsbG8=",
+        webhook_url="https://example.com/webhook",
+        pages_to_parse=[1, 2, 3],
+        ocr_pages=[2],
+    )
+
+    assert req.webhook_url == "https://example.com/webhook"
+    assert req.ocr_pages == [2]
+
+
 def test_legacy_model_codes_rejected():
     # Internal `model0X` names from the Inkwell codebase are no longer
     # accepted on the public API.
