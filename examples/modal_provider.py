@@ -28,6 +28,8 @@ import modal
 APP_NAME = "stern-open-ingest-provider"
 PROVIDER_SECRET_NAME = os.getenv("MODAL_PROVIDER_SECRET_NAME", "stern-open-ingest-provider-prod")
 PARSE_MIN_CONTAINERS = int(os.getenv("MODAL_PROVIDER_PARSE_MIN_CONTAINERS", "1"))
+GPU_MIN_CONTAINERS = int(os.getenv("MODAL_PROVIDER_GPU_MIN_CONTAINERS", "0"))
+GPU_MAX_CONTAINERS = int(os.getenv("MODAL_PROVIDER_GPU_MAX_CONTAINERS", "10"))
 REMOTE_ROOT = "/root/stern-open-ingest"
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -124,6 +126,7 @@ gpu_image = (
 
 app = modal.App(APP_NAME)
 provider_secret = modal.Secret.from_name(PROVIDER_SECRET_NAME)
+_paddle_server: subprocess.Popen | None = None
 
 
 def _store() -> Any:
@@ -171,6 +174,23 @@ def _start_paddle_server() -> subprocess.Popen:
     print("Starting PaddleOCR-VL recognition server:")
     print(" ".join(command))
     return subprocess.Popen(command)
+
+
+def _ensure_paddle_server() -> None:
+    global _paddle_server
+    if _paddle_server is not None and _paddle_server.poll() is None:
+        try:
+            _wait_for_server(_paddle_server, timeout_seconds=10)
+            return
+        except RuntimeError:
+            _paddle_server.terminate()
+            try:
+                _paddle_server.wait(timeout=30)
+            except subprocess.TimeoutExpired:
+                _paddle_server.kill()
+
+    _paddle_server = _start_paddle_server()
+    _wait_for_server(_paddle_server)
 
 
 @app.function(
@@ -247,6 +267,8 @@ def process_document(provider_job_id: str, request: dict[str, Any] | None = None
     ephemeral_disk=524_288,
     timeout=60 * 60,
     retries=modal.Retries(max_retries=2),
+    min_containers=GPU_MIN_CONTAINERS,
+    max_containers=GPU_MAX_CONTAINERS,
 )
 def run_pipeline_on_gpu(raw_request: dict[str, Any]) -> dict[str, Any]:
     os.chdir(REMOTE_ROOT)
@@ -259,16 +281,8 @@ def run_pipeline_on_gpu(raw_request: dict[str, Any]) -> dict[str, Any]:
     os.environ["PADDLE_OCR_VL_REC_BACKEND"] = "vllm-server"
     os.environ["PADDLE_OCR_VL_DEVICE"] = "cpu"
 
-    server = _start_paddle_server()
-    try:
-        _wait_for_server(server)
-        return run_pipeline_locally(raw_request, needs_gpu=True)
-    finally:
-        server.terminate()
-        try:
-            server.wait(timeout=30)
-        except subprocess.TimeoutExpired:
-            server.kill()
+    _ensure_paddle_server()
+    return run_pipeline_locally(raw_request, needs_gpu=True)
 
 
 @app.function(

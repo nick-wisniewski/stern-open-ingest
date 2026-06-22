@@ -171,6 +171,8 @@ PROVIDER_STATE_PREFIX=stern-open-ingest
 PROVIDER_STATE_S3_ENDPOINT_URL=https://... # only for S3-compatible stores
 MODAL_PROVIDER_GPU=L4
 MODAL_PROVIDER_PARSE_MIN_CONTAINERS=1
+MODAL_PROVIDER_GPU_MIN_CONTAINERS=0
+MODAL_PROVIDER_GPU_MAX_CONTAINERS=10
 ```
 
 Deploy the endpoint:
@@ -207,6 +209,14 @@ the job id. The orchestrator downloads the presigned input URL and stores
 `jobs/{provider_job_id}/input/original.{ext}` outside the request path.
 Completed runs store `jobs/{provider_job_id}/result/document.json` and
 `jobs/{provider_job_id}/result/document.md`.
+
+GPU work uses Modal's function-call queue. By default, the Paddle OCR function
+scales to zero and caps active GPU containers at 10. Extra GPU jobs wait in
+Modal until a GPU container is available. Each running GPU container keeps its
+colocated `paddleocr genai_server` process alive between jobs, so repeated jobs
+on an active container avoid paying the server startup cost on every document.
+Set `MODAL_PROVIDER_GPU_MIN_CONTAINERS=1` only when the lower first-job latency
+is worth paying for an idle warm GPU.
 
 Webhook payloads intentionally stay small:
 
