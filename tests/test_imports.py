@@ -31,6 +31,8 @@ def test_pipeline_modules_importable():
         "tensorlake_docai.pipeline.output_formatter",
         "tensorlake_docai.models.intermediate_objects",
         "tensorlake_docai.models.layout_objects",
+        "tensorlake_docai.provider_state.orchestrator",
+        "tensorlake_docai.provider_state.storage",
         "tensorlake_docai.tables.table_merging",
         "tensorlake_docai.vlm.cloud",
     ):

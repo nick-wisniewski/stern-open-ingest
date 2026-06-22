@@ -141,11 +141,93 @@ pages. Output is written to `./debug/document.json` and `./debug/document.md`.
 
 ---
 
-## 2d. Modal smoke test from a Mac
+## 2d. Modal provider endpoint
+
+The provider endpoint uses Modal for request handling/autoscaling and S3 as the
+provider-side state/artifact store. Rails sends a presigned HTTPS file URL plus
+a webhook URL, then receives a job id immediately with `200 OK`.
+
+Required environment or Modal secret values:
+
+```bash
+PROVIDER_STATE_BUCKET=your-provider-state-bucket
+AWS_REGION=us-east-1
+AWS_ACCESS_KEY_ID=...
+AWS_SECRET_ACCESS_KEY=...
+```
+
+The Modal app attaches `modal.Secret.from_name("stern-open-ingest-provider-prod")`
+by default. If your secret has a different name, set the local deploy-time
+environment variable before deploying:
+
+```bash
+export MODAL_PROVIDER_SECRET_NAME=your-modal-secret-name
+```
+
+Optional values:
+
+```bash
+PROVIDER_STATE_PREFIX=stern-open-ingest
+PROVIDER_STATE_S3_ENDPOINT_URL=https://... # only for S3-compatible stores
+MODAL_PROVIDER_GPU=L4
+MODAL_PROVIDER_PARSE_MIN_CONTAINERS=1
+```
+
+Deploy the endpoint:
+
+```bash
+modal deploy examples/modal_provider.py
+```
+
+Request body:
+
+```json
+{
+  "file_url": "https://bucket.s3.amazonaws.com/input.pdf?...signature...",
+  "webhook_url": "https://rails.example.com/open_ingest_webhook",
+  "ocr_model": "paddle-ocr-vl"
+}
+```
+
+`ocr_model` is optional and defaults to `paddle-ocr-vl`. The provider derives
+`file_name` and initial MIME hints from the presigned URL path, then validates the
+actual file content after download.
+
+Response body:
+
+```json
+{
+  "job_id": "provider-job-id"
+}
+```
+
+The parse endpoint keeps one warm receiver container by default, stores
+`jobs/{provider_job_id}/state.json`, then spawns the CPU orchestrator and returns
+the job id. The orchestrator downloads the presigned input URL and stores
+`jobs/{provider_job_id}/input/original.{ext}` outside the request path.
+Completed runs store `jobs/{provider_job_id}/result/document.json` and
+`jobs/{provider_job_id}/result/document.md`.
+
+Webhook payloads intentionally stay small:
+
+```json
+{
+  "job_id": "provider-job-id",
+  "status": "succeeded",
+  "result_object_key": "jobs/.../result/document.json",
+  "markdown_object_key": "jobs/.../result/document.md"
+}
+```
+
+Provider state defaults to a 7-day retention timestamp in `expires_at`; bucket
+lifecycle policy should enforce actual object expiry.
+
+---
+
+## 2e. Modal smoke test from a Mac
 
 If you are on a Mac, use Modal to get the CUDA host for the Paddle smoke test.
-This is still a smoke harness, not the production receiver/queue/webhook
-deployment.
+This is still a raw OCR smoke harness, separate from the provider endpoint.
 
 Install and authenticate Modal locally:
 

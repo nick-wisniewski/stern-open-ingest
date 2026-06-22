@@ -20,9 +20,9 @@ orchestration.
 
 - We invoke the workflow with the `--local` runner — each task runs in our own
   process/container.
-- Production target: scale-to-zero GPU workers pulling from our own queue, with
-  a small always-on HTTP receiver in front (accepts the Rails request, returns
-  200, enqueues, fires the webhook on completion).
+- Production target: a Modal web endpoint that stores provider state/artifacts in
+  S3, returns a provider job id immediately, and spawns Modal CPU/GPU functions
+  that fire the Rails webhook on completion.
 - Do **not** use `tl deploy`, `TENSORLAKE_API_KEY`, or `scripts/sync-secrets.sh`.
   Those ship functions to "Tensorlake's pool" and are upstream-only — they do
   not apply here.

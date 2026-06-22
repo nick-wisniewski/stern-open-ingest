@@ -18,10 +18,9 @@ We run the pipeline **ourselves** with the `--local` runner — each task execut
 in our own process/container. We do **not** use Tensorlake's hosted
 orchestration, `tl deploy`, or a `TENSORLAKE_API_KEY`.
 
-The production target is scale-to-zero GPU workers pulling from our own queue,
-with a small always-on HTTP receiver in front (accepts the Rails request, returns
-200, enqueues, fires the webhook on completion). That layer is not built yet —
-today the entry point is the example scripts and the `ParseRequest` API.
+The provider entry point is a Modal web endpoint backed by S3 state/artifacts.
+Rails sends a presigned HTTPS file URL, gets back a provider job id, and later
+receives a webhook containing that job id plus S3 result keys.
 
 ---
 
@@ -31,8 +30,8 @@ Given a PDF or image (PNG, JPEG, HEIF, HEIC), the workflow:
 
 1. **Validates** the input MIME type (content detection via `python-magic`, with filename
    extension as a fallback).
-2. **Runs OCR / layout** with `dots-ocr` (the only backend in this fork; see
-   [`docs/models.md`](docs/models.md)).
+2. **Runs OCR / layout** with the selected backend, currently focused on the
+   lighter `paddle-ocr-vl` path for scanned/table-heavy pages.
 3. **Enriches** (optional): cross-page table merging, key-value extraction, and
    cross-page header cleanup.
 4. **Returns** a single `ParsedDocument` (pages, fragments, tables, markdown,
