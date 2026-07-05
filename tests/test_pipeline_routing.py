@@ -20,7 +20,7 @@ from tensorlake_docai.models.layout_objects import (
     PageLayout,
     PageLayoutElement,
 )
-from tensorlake_docai.ocr import OCR_BACKENDS, resolve_ocr_backend
+from tensorlake_docai.ocr import DEFAULT_OCR_MODEL, OCR_BACKENDS, resolve_ocr_backend
 from tensorlake_docai.pipeline import routing
 from tensorlake_docai.pipeline.api import PageFragmentType, ParseRequest
 
@@ -74,8 +74,8 @@ def test_unknown_ocr_model_falls_back_to_default():
     """Unknown values should not crash — they fall back to DEFAULT_OCR_MODEL.
     pydantic's Literal validates real user input at the API boundary; this
     guards against internal callers passing through stale strings."""
-    assert resolve_ocr_backend("model99") is resolve_ocr_backend("dots-ocr")
-    assert resolve_ocr_backend(None) is resolve_ocr_backend("dots-ocr")
+    assert resolve_ocr_backend("model99") is resolve_ocr_backend(DEFAULT_OCR_MODEL)
+    assert resolve_ocr_backend(None) is resolve_ocr_backend(DEFAULT_OCR_MODEL)
 
 
 def test_pdf_file_goes_to_ocr_by_default():

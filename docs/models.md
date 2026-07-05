@@ -3,7 +3,7 @@
 This fork ships self-hosted OCR backends only. The cloud backends from upstream
 (Azure Document Intelligence, AWS Textract, Google Gemini) have been removed.
 Select the backend via `ocr_model` on the `ParseRequest` (it defaults to
-`dots-ocr`).
+`paddle-ocr-vl`).
 
 > Gemini is still available as an LLM/VLM **provider** (e.g. for table merging
 > and key-value extraction) — it is just no longer an OCR backend.
@@ -45,7 +45,7 @@ CUDA host. Weights are pulled from Hugging Face Hub on first cold-start.
 | Custom figure-OCR prompt | no |
 | Hardware | CUDA GPU plus local PaddleOCR-VL recognition server |
 
-`paddle-ocr-vl` is a non-default backend for PaddleOCR-VL validation. The worker
+`paddle-ocr-vl` is the default backend, running PaddleOCR-VL. The worker
 uses the PaddleOCR client locally and points its multimodal recognition step at a
 local vLLM/SGLang-style server. Configure that server with:
 

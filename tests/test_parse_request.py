@@ -10,7 +10,7 @@ from tensorlake_docai.pipeline.routing import _download_file
 
 def test_minimal_request_with_bytes():
     req = ParseRequest(file_name="x.pdf", mime_type="application/pdf", file_bytes="aGVsbG8=")
-    assert req.ocr_model == "dots-ocr"  # default
+    assert req.ocr_model == "paddle-ocr-vl"  # default
     assert req.table_output_mode == "markdown"
 
 

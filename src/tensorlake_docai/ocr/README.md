@@ -108,7 +108,7 @@ decorators and raise a `RequestError` at startup if `torch.cuda.is_available()`
 is false. If your new backend has similar host requirements, add an analogous
 guard at the top of its `run()` method.
 
-This fork also registers `paddle-ocr-vl` as a non-default CUDA backend. It keeps
+This fork also registers `paddle-ocr-vl` as the default CUDA backend. It keeps
 the Paddle imports lazy, adapts Paddle's `parsing_res_list` JSON into the shared
 `PageLayout` / `PageLayoutElement` models, and expects a local PaddleOCR-VL VLM
 recognition server configured by `PADDLE_OCR_VL_SERVER_URL` and
