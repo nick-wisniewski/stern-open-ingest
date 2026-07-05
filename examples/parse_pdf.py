@@ -119,9 +119,9 @@ def build_parser() -> argparse.ArgumentParser:
     core.add_argument("--file", required=True, help="Local path or presigned HTTPS URL")
     core.add_argument(
         "--ocr-model",
-        default="dots-ocr",
+        default=PADDLE_OCR_MODEL,
         choices=["dots-ocr", PADDLE_OCR_MODEL],
-        help="OCR backend (see docs/models.md). Default: dots-ocr.",
+        help="OCR backend (see docs/models.md). Default: paddle-ocr-vl.",
     )
     core.add_argument("--pages", type=int, nargs="*", help="Pages to parse (1-indexed)")
     core.add_argument(

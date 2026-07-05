@@ -17,7 +17,7 @@ OCR_BACKENDS: dict[str, str] = {
     "paddle-ocr-vl": "tensorlake_docai.ocr.paddle_ocr_vl.PaddleOCRVLTask",
 }
 
-DEFAULT_OCR_MODEL = "dots-ocr"
+DEFAULT_OCR_MODEL = "paddle-ocr-vl"
 
 
 def resolve_ocr_backend(ocr_model: Optional[str]):
