@@ -71,3 +71,8 @@ debug/
 model/
 models/
 .tensorlake/
+
+# Benchmark run outputs (regenerated per run; never committed).
+# Ignore everything under results/ but keep the empty dir tracked via .gitkeep.
+benchmarks/results/*
+!benchmarks/results/.gitkeep

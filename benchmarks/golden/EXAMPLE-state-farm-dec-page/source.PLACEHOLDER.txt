@@ -1,0 +1,8 @@
+Placeholder — no real document is committed in the EXAMPLE folder.
+
+A human adds the redacted source document here, named to match `source_file`
+in meta.yaml (default `source.pdf`; `source.png` or `source.jpg` are also
+allowed). The document MUST be redacted or synthetic per the `provenance`
+field in meta.yaml — never commit un-redacted real customer data.
+
+Once the real source file is in place, delete this placeholder.

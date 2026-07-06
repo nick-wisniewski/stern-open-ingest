@@ -1,0 +1,1 @@
+This is a template/example golden-document folder — copy it per real document; the real (redacted) source file is added by a human (replace `source.PLACEHOLDER.txt` with the actual `source.pdf`/`source.png`).

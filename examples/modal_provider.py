@@ -75,6 +75,7 @@ base_image = (
             "debug",
             "models",
             ".tensorlake",
+            "benchmarks",
         ],
     )
     .run_commands(
@@ -117,6 +118,7 @@ gpu_image = (
             "debug",
             "models",
             ".tensorlake",
+            "benchmarks",
         ],
     )
     .run_commands(

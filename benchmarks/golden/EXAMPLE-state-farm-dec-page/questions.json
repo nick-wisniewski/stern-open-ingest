@@ -1,0 +1,11 @@
+{
+  "source_policy_id": 3800,
+  "carrier": "State Farm",
+  "questions": [
+    { "key": "effective_date",  "prompt": "Does the policy have an effective date? If so, what is it?",  "present": true,  "value": "2025-03-01",  "type": "date" },
+    { "key": "expiration_date", "prompt": "Does the policy have an expiration date? If so, what is it?", "present": true,  "value": "2026-03-01",  "type": "date" },
+    { "key": "policy_number",   "prompt": "Does the policy have a policy number? If so, what is it?",    "present": true,  "value": "GL-4471902",  "type": "string" },
+    { "key": "liability_limit", "prompt": "Does the policy show the liability limit? If so, what is it?", "present": true,  "value": "1000000",     "type": "currency" },
+    { "key": "coverage_limit.personal_property", "prompt": "Does the policy have a personal property coverage limit? If so, what is it?", "present": false, "value": null, "type": "currency" }
+  ]
+}
