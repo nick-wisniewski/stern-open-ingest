@@ -1,0 +1,10 @@
+carrier: State Farm
+source_policy_id: 3800          # stern-liability policy id this doc was derived from (traceability)
+provenance: synthetic           # synthetic | deidentified | consented-real
+doc_type: declaration_page      # human-curated
+source_file: source.pdf         # the redacted document filename (pdf|png|jpg)
+ocr_model: paddle-ocr-vl
+pipeline_flags:
+  key_value_extraction: true
+  table_merging: true
+notes: "Synthetic State Farm declaration page. Personal-property coverage is intentionally absent to exercise the present=false path."

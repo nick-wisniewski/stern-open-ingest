@@ -62,6 +62,19 @@ pytest tests/ -q
 Fix `ruff` errors before handing back. Don't silence rules with `# noqa` unless
 the violation is intentional and worth a brief comment.
 
+## Benchmarks
+
+`benchmarks/` holds a model-output benchmark suite (scaffolding only so far).
+It measures whether our parse output lets the **downstream analysis agent**
+(OpenAI `gpt-5-mini`) recover the right answers — **field accuracy is the
+headline metric, not markdown fidelity** (fidelity is a directional tripwire).
+Golden docs live one-per-folder under `benchmarks/golden/`, each with a frozen
+`questions.json` (presence + value questions) and `meta.yaml`. Adding a
+question is a pure data edit. The runnable harness (`run.py`), scoring, CI, and
+a separate Modal instance for CI are **deferred** pending model API keys — see
+`benchmarks/README.md`. `benchmarks/` is excluded from the deployed Modal image
+(see the `ignore=[...]` lists in `examples/modal_provider.py`).
+
 ## Package structure
 
 All functions live under `src/tensorlake_docai/...` and use absolute imports
